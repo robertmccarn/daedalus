@@ -2,7 +2,6 @@ using System.Drawing;
 
 public class ExplorationHudRenderer : IDisposable
 {
-    private readonly AtlasSlicer uiAtlas = new();
     private readonly Font uiFont = new(FontFamily.GenericMonospace, 14);
     private readonly Font titleFont = new(FontFamily.GenericMonospace, 20);
     private readonly Font bottomFont = new(FontFamily.GenericMonospace, 14);
@@ -11,15 +10,24 @@ public class ExplorationHudRenderer : IDisposable
     {
         const int sidebarX = 780;
         graphics.DrawLine(Pens.White, sidebarX, 20, sidebarX, 620);
-        float x = sidebarX + 25; float y = 30;
+        float x = sidebarX + 25;
+        float y = 30;
         graphics.DrawString("STATUS", titleFont, Brushes.White, x, y);
-        uiAtlas.Draw(graphics, uiAtlas.GetPortraitRegion(AtlasPortrait.Cyrus), new Rectangle((int)x, (int)y + 35, 120, 120));
+
+        graphics.FillRectangle(Brushes.DarkSlateBlue, x, y + 35, 120, 120);
+        graphics.DrawRectangle(Pens.White, x, y + 35, 120, 120);
+        graphics.DrawString(world.Player.Name, uiFont, Brushes.White, x + 12, y + 85);
+
         y += 165;
         graphics.DrawString(world.Player.Name, titleFont, Brushes.Red, x, y);
-        y += 35; graphics.DrawString($"LV {world.Player.Level}", uiFont, Brushes.White, x, y);
-        y += 30; graphics.DrawString($"HP {world.Player.HP}/{world.Player.MAXHP}", uiFont, Brushes.White, x, y);
-        y += 45; graphics.DrawLine(Pens.White, x, y, x + 220, y);
-        y += 25; graphics.DrawString($"Position: ({world.Player.X}, {world.Player.Y})", uiFont, Brushes.White, x, y);
+        y += 35;
+        graphics.DrawString($"LV {world.Player.Level}", uiFont, Brushes.White, x, y);
+        y += 30;
+        graphics.DrawString($"HP {world.Player.HP}/{world.Player.MAXHP}", uiFont, Brushes.White, x, y);
+        y += 45;
+        graphics.DrawLine(Pens.White, x, y, x + 220, y);
+        y += 25;
+        graphics.DrawString($"Position: ({world.Player.X}, {world.Player.Y})", uiFont, Brushes.White, x, y);
 
         const int bottomY = 640;
         graphics.DrawLine(Pens.White, 20, bottomY, 1080, bottomY);
@@ -31,6 +39,8 @@ public class ExplorationHudRenderer : IDisposable
 
     public void Dispose()
     {
-        uiAtlas.Dispose(); uiFont.Dispose(); titleFont.Dispose(); bottomFont.Dispose();
+        uiFont.Dispose();
+        titleFont.Dispose();
+        bottomFont.Dispose();
     }
 }
