@@ -1,0 +1,8 @@
+{
+  "key_color_hex": "#00FF00",
+  "sheets": {
+    "portraits": { "texture": "portraits.png", "count": 3, "mapping": { "cyrus": 0, "technomancer": 1, "paladin": 2 } },
+    "commands": { "texture": "command_icons.png", "count": 6, "mapping": { "attack": 0, "defend": 1, "tech": 2, "item": 3, "interact": 4, "retreat": 5 } },
+    "status": { "texture": "status_icons.png", "count": 6, "mapping": { "atk_buff": 0, "def_buff": 1, "haste": 2, "poison": 3, "bleed": 4, "core_charge": 5 } }
+  }
+}

@@ -1,0 +1,7 @@
+bin/
+obj/
+docx_qa/
+build_design_document.py
+*.user
+*.suo
+.vs/

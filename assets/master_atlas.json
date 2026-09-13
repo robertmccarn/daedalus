@@ -1,0 +1,31 @@
+{
+  "texture": "master_atlas.png",
+  "key_color_hex": "#00FF00",
+  "grid_layout": { "columns": 4, "rows": 5 },
+  "regions": {
+    "units": {
+      "cyrus": { "row": 0, "frame_count": 4, "pivot_normalized": { "x": 0.5, "y": 0.92 } },
+      "steel_golem": { "row": 1, "frame_count": 4, "pivot_normalized": { "x": 0.5, "y": 0.92 } },
+      "corrupted_automaton": { "row": 2, "frame_count": 4, "pivot_normalized": { "x": 0.5, "y": 0.92 } }
+    },
+    "tiles": {
+      "row": 3,
+      "pivot_normalized": { "x": 0.5, "y": 0.0 },
+      "variants": {
+        "stone_floor": { "col": 0 },
+        "entropy_floor": { "col": 1 },
+        "void_pit": { "col": 2 },
+        "wall_block": { "col": 3 }
+      }
+    },
+    "icons": {
+      "row": 4,
+      "items": {
+        "core_cyan": { "col": 0 },
+        "core_red": { "col": 1 },
+        "catalyst_iron": { "col": 2 },
+        "battery_cell": { "col": 3 }
+      }
+    }
+  }
+}

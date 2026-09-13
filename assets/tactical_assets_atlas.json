@@ -1,0 +1,6 @@
+{
+  "boss_portraits": { "texture": "enemy_boss_expressions.png", "frames": [[0, 0, 543, 724], [543, 0, 543, 724], [1086, 0, 543, 724], [1629, 0, 543, 724]] },
+  "enemy_animations": { "texture": "enemy_spritesheets.png", "cell": [221, 110], "columns": 8, "rows": 8 },
+  "tactical_ui": { "texture": "tactical_ui_suite.png", "highlight_size": [112, 112] },
+  "enemy_cards": { "texture": "enemy_battle_cards.png", "portrait": [31, 26, 321, 461], "action_size": [178, 223] }
+}
