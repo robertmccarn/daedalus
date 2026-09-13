@@ -1,14 +1,10 @@
 public class GameObject
 {
     public string Name { get; private set; }
-
     public int X { get; private set; }
     public int Y { get; private set; }
 
-    public GameObject(
-        string name,
-        int x,
-        int y)
+    public GameObject(string name, int x, int y)
     {
         Name = name;
         X = x;
@@ -22,17 +18,12 @@ public class GameObject
     }
 }
 
-
 public class Character : GameObject
 {
-    public AtlasUnit VisualUnit { get; private set; }
     public List<StatusEffect> StatusEffects { get; } = new();
-    public IsometricEnemyAnimator? EnemyAnimator { get; }
     public int Level { get; private set; }
-
     public int HP { get; private set; }
     public int MAXHP { get; private set; }
-
     public Stats Stats { get; private set; }
 
     public Character(
@@ -41,18 +32,13 @@ public class Character : GameObject
         int level,
         Stats stats,
         int x,
-        int y,
-        AtlasUnit visualUnit = AtlasUnit.Cyrus)
+        int y)
         : base(name, x, y)
     {
         MAXHP = maxHp;
         HP = maxHp;
         Level = level;
         Stats = stats;
-        VisualUnit = visualUnit;
-        EnemyAnimator = visualUnit is AtlasUnit.VoidHound or AtlasUnit.ReconDrone
-            ? new IsometricEnemyAnimator()
-            : null;
     }
 
     public void TakeDamage(int damage)
@@ -86,7 +72,6 @@ public enum StatusEffect
     CoreCharge = 5
 }
 
-
 public class Stats
 {
     public int Strength { get; private set; }
@@ -94,11 +79,7 @@ public class Stats
     public int Agility { get; private set; }
     public int Luck { get; private set; }
 
-    public Stats(
-        int strength,
-        int magic,
-        int agility,
-        int luck)
+    public Stats(int strength, int magic, int agility, int luck)
     {
         Strength = strength;
         Magic = magic;
@@ -106,7 +87,6 @@ public class Stats
         Luck = luck;
     }
 }
-
 
 public enum DamageType
 {
@@ -117,19 +97,13 @@ public enum DamageType
     Wind
 }
 
-
 public class Attack
 {
     public string Name { get; private set; }
-
     public int Power { get; private set; }
-
     public DamageType Type { get; private set; }
 
-    public Attack(
-        string name,
-        int power,
-        DamageType type)
+    public Attack(string name, int power, DamageType type)
     {
         Name = name;
         Power = power;
