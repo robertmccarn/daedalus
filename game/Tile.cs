@@ -11,22 +11,19 @@ public enum TileType
     Pillar
 }
 
-
 public class Tile
 {
-    public TileType Type { get; private set; }
-
-    public char Symbol { get; private set; }
-
-    public bool IsWalkable { get; private set; }
+    public TileType Type { get; }
+    public bool IsWalkable { get; }
+    public bool BlocksVision { get; }
 
     public Tile(
         TileType type,
-        char symbol,
-        bool isWalkable)
+        bool isWalkable,
+        bool blocksVision)
     {
         Type = type;
-        Symbol = symbol;
         IsWalkable = isWalkable;
+        BlocksVision = blocksVision;
     }
 }
