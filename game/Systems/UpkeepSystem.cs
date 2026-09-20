@@ -12,10 +12,6 @@ public static class UpkeepSystem
         int cost = CalculateTurnCost(expedition);
 
         expedition.Upkeep += cost;
-
-        if (campaign.Gold >= cost)
-            campaign.Gold -= cost;
-
         return cost;
     }
 }
