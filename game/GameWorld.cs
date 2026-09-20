@@ -187,7 +187,8 @@ public class GameWorld
                 chest.X,
                 chest.Y,
                 false,
-                DungeonNodeType.Chest));
+                DungeonNodeType.Chest,
+                $"floor-{Floor}-chest"));
         }
 
         InteractiveProp? terminal = GetPropAt(SpawnX + 2, SpawnY);
@@ -207,7 +208,8 @@ public class GameWorld
                 terminal.X,
                 terminal.Y,
                 false,
-                DungeonNodeType.Terminal));
+                DungeonNodeType.Terminal,
+                $"floor-{Floor}-terminal"));
         }
 
         Nodes.Add(new DungeonNode
