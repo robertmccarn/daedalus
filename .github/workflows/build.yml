@@ -26,3 +26,6 @@ jobs:
 
       - name: Build
         run: dotnet build DOTNETCSHARP.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/Daedalus.Tests/Daedalus.Tests.csproj --configuration Release
