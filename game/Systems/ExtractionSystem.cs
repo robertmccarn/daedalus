@@ -13,6 +13,10 @@ public static class ExtractionSystem
             stateManager.Campaign,
             expedition);
 
+        stateManager.Campaign.Gold = Math.Max(
+            0,
+            stateManager.Campaign.Gold - expedition.Upkeep);
+
         stateManager.CompleteExpedition();
         return true;
     }
@@ -22,13 +26,13 @@ public static class ExtractionSystem
         ExpeditionState expedition,
         RewardBundle reward)
     {
-        campaign.Gold += reward.Gold;
+        expedition.CarriedGold += reward.Gold;
 
         foreach (CoreReward coreReward in reward.Cores)
         {
             for (int i = 0; i < coreReward.Quantity; i++)
             {
-                campaign.Cores.Add(new EnergyCore
+                expedition.CarriedCores.Add(new EnergyCore
                 {
                     Type = coreReward.Type,
                     Charge = coreReward.Charge
@@ -37,24 +41,25 @@ public static class ExtractionSystem
         }
 
         foreach (Gear gear in reward.Gear)
-            campaign.Gear.Add(gear);
+            expedition.CarriedGear.Add(gear);
 
         foreach (Material material in reward.Materials)
         {
-            InventorySystem.AddMaterial(
-                campaign,
-                material.Id,
-                material.Name,
-                material.Quantity);
+            Material? existing = expedition.CarriedMaterials
+                .FirstOrDefault(candidate => candidate.Id == material.Id);
+
+            if (existing != null)
+                existing.Quantity += material.Quantity;
+            else
+                expedition.CarriedMaterials.Add(new Material
+                {
+                    Id = material.Id,
+                    Name = material.Name,
+                    Quantity = material.Quantity
+                });
         }
 
         foreach (InventoryItem item in reward.Items)
-        {
-            InventorySystem.AddItem(
-                expedition,
-                item.Id,
-                item.Name,
-                item.Quantity);
-        }
+            InventorySystem.AddItem(expedition, item.Id, item.Name, item.Quantity);
     }
 }
