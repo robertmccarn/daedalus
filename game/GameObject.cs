@@ -25,6 +25,8 @@ public class Character : GameObject
     public int HP { get; private set; }
     public int MAXHP { get; private set; }
     public Stats Stats { get; private set; }
+    public int AttackBonus { get; private set; }
+    public int DefenseBonus { get; private set; }
 
     public Character(
         string name,
@@ -39,6 +41,14 @@ public class Character : GameObject
         HP = maxHp;
         Level = level;
         Stats = stats;
+        AttackBonus = 0;
+        DefenseBonus = 0;
+    }
+
+    public void SetEquipmentBonuses(int attackBonus, int defenseBonus)
+    {
+        AttackBonus = Math.Max(0, attackBonus);
+        DefenseBonus = Math.Max(0, defenseBonus);
     }
 
     public void TakeDamage(int damage)
