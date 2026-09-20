@@ -14,6 +14,8 @@ public class ExpeditionState
     public List<string> DiscoveredCells { get; set; } = new();
     public int Upkeep { get; set; }
     public List<string> NodeHistory { get; set; } = new();
+    public List<string> CompletedNodeIds { get; set; } = new();
+    public List<string> DefeatedNodeIds { get; set; } = new();
     public string ExtractionState { get; set; } = "Active";
     public List<PartyMember> Party { get; set; } = new();
     public string CurrentNode { get; set; } = "Start";
