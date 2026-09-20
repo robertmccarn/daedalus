@@ -109,6 +109,19 @@ public class GameStateManager
 
         Campaign = campaign;
         ActiveExpedition = expedition;
+
+        foreach (PartyMember campaignMember in Campaign.PartyRoster)
+        {
+            PartyMember? expeditionMember = ActiveExpedition.Party
+                .FirstOrDefault(member => member.Id == campaignMember.Id);
+
+            if (expeditionMember == null)
+                continue;
+
+            expeditionMember.EquippedGearIds =
+                new List<string>(campaignMember.EquippedGearIds);
+        }
+
         return true;
     }
 
