@@ -1,8 +1,9 @@
 {
   "game": "Daedalus",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "runCount": 0,
   "lastRunId": null,
   "lastRunStartedUtc": null,
-  "lastRunCompletedUtc": null
+  "lastRunCompletedUtc": null,
+  "saveSchemaVersion": 1
 }

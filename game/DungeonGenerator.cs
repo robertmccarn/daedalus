@@ -1,15 +1,17 @@
 public class DungeonGenerator
 {
-    private readonly Random random = new();
+    private readonly Random random;
+
+    public DungeonGenerator(int? seed = null)
+    {
+        random = seed.HasValue ? new Random(seed.Value) : new Random();
+    }
 
     public (
         Tile[,] Map,
         (int X, int Y) Spawn,
         (int X, int Y) Exit)
-        Generate(
-            int width,
-            int height,
-            int roomCount)
+        Generate(int width, int height, int roomCount)
     {
         Tile[,] map = new Tile[height, width];
 
@@ -29,11 +31,7 @@ public class DungeonGenerator
         return (map, spawn, exit);
     }
 
-    private List<Room> GenerateRooms(
-        Tile[,] map,
-        int width,
-        int height,
-        int roomCount)
+    private List<Room> GenerateRooms(Tile[,] map, int width, int height, int roomCount)
     {
         List<Room> rooms = new();
         int attempts = 0;
@@ -106,11 +104,7 @@ public class DungeonGenerator
             map[y, x] = CreateFloor();
     }
 
-    private static void CarveHorizontalCorridor(
-        Tile[,] map,
-        int startX,
-        int endX,
-        int y)
+    private static void CarveHorizontalCorridor(Tile[,] map, int startX, int endX, int y)
     {
         int minX = Math.Min(startX, endX);
         int maxX = Math.Max(startX, endX);
@@ -119,11 +113,7 @@ public class DungeonGenerator
             map[y, x] = CreateFloor();
     }
 
-    private static void CarveVerticalCorridor(
-        Tile[,] map,
-        int startY,
-        int endY,
-        int x)
+    private static void CarveVerticalCorridor(Tile[,] map, int startY, int endY, int x)
     {
         int minY = Math.Min(startY, endY);
         int maxY = Math.Max(startY, endY);
@@ -139,14 +129,9 @@ public class DungeonGenerator
             map[y, x] = CreateWall();
     }
 
-    private static Tile CreateWall() =>
-        new(TileType.Wall, false, true);
-
-    private static Tile CreateFloor() =>
-        new(TileType.Floor, true, false);
-
-    private static Tile CreateStairsDown() =>
-        new(TileType.StairsDown, true, false);
+    private static Tile CreateWall() => new(TileType.Wall, false, true);
+    private static Tile CreateFloor() => new(TileType.Floor, true, false);
+    private static Tile CreateStairsDown() => new(TileType.StairsDown, true, false);
 
     private class Room
     {

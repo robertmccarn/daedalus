@@ -2,29 +2,39 @@ namespace Systemic.Engine.State;
 
 public class GameStateManager
 {
-    public CampaignState Campaign { get; } = new();
-    public ExpeditionState ActiveExpedition { get; private set; } = new();
+    public CampaignState Campaign { get; private set; }
+    public ExpeditionState ActiveExpedition { get; private set; }
 
-    public void StartNewExpedition()
+    public GameStateManager()
     {
-        ActiveExpedition = new ExpeditionState
-        {
-            PlayerGridPosition = (26, 5)
-        };
+        Campaign = CreateDefaultCampaign();
+        ActiveExpedition = new ExpeditionState();
     }
 
     public void StartNewExpedition(
         int startX,
         int startY,
         int health,
-        int maxHealth)
+        int maxHealth,
+        int floor = 1,
+        int? floorSeed = null)
     {
         ActiveExpedition = new ExpeditionState
         {
+            CurrentFloor = floor,
             Health = health,
             MaxHealth = maxHealth,
-            PlayerGridPosition = (startX, startY)
+            PlayerGridPosition = (startX, startY),
+            FloorSeed = floorSeed ?? Random.Shared.Next(),
+            Party = Campaign.PartyRoster.Select(ClonePartyMember).ToList()
         };
+
+        MarkDiscovered(startX, startY);
+    }
+
+    public void StartNewExpedition()
+    {
+        StartNewExpedition(26, 5, 30, 30);
     }
 
     public void SynchronizeExpedition(int x, int y, int health, int maxHealth)
@@ -32,5 +42,108 @@ public class GameStateManager
         ActiveExpedition.PlayerGridPosition = (x, y);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
+        MarkDiscovered(x, y);
     }
+
+    public void AdvanceFloor(int startX, int startY, int health, int maxHealth)
+    {
+        ActiveExpedition.CurrentFloor++;
+        ActiveExpedition.TurnCount = 0;
+        ActiveExpedition.NodeHistory.Clear();
+        ActiveExpedition.CurrentNode = "Start";
+        ActiveExpedition.PlayerGridPosition = (startX, startY);
+        ActiveExpedition.Health = health;
+        ActiveExpedition.MaxHealth = maxHealth;
+        ActiveExpedition.FloorSeed = Random.Shared.Next();
+        ActiveExpedition.DiscoveredCells.Clear();
+        MarkDiscovered(startX, startY);
+
+        Campaign.HighestDepth = Math.Max(
+            Campaign.HighestDepth,
+            ActiveExpedition.CurrentFloor);
+    }
+
+    public void MarkDiscovered(int x, int y)
+    {
+        string key = $"{x},{y}";
+        if (!ActiveExpedition.DiscoveredCells.Contains(key))
+            ActiveExpedition.DiscoveredCells.Add(key);
+    }
+
+    public bool IsDiscovered(int x, int y) =>
+        ActiveExpedition.DiscoveredCells.Contains($"{x},{y}");
+
+    public void CompleteExpedition()
+    {
+        Campaign.RunsCompleted++;
+        ActiveExpedition.ExtractionState = "Extracted";
+    }
+
+    public bool Save(string path) =>
+        TrySave(path, out _);
+
+    public bool TrySave(string path, out string? error)
+    {
+        try
+        {
+            SaveSystem.Save(path, Campaign, ActiveExpedition);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool Load(string path)
+    {
+        if (!SaveSystem.TryLoad(path, out CampaignState campaign, out ExpeditionState expedition))
+            return false;
+
+        Campaign = campaign;
+        ActiveExpedition = expedition;
+        return true;
+    }
+
+    private static CampaignState CreateDefaultCampaign() =>
+        new()
+        {
+            PartyRoster = new()
+            {
+                new PartyMember
+                {
+                    Id = "arden",
+                    Name = "Arden",
+                    Level = 1,
+                    HP = 30,
+                    MaxHP = 30,
+                    Stats = new StatsData
+                    {
+                        Strength = 8,
+                        Magic = 3,
+                        Agility = 6,
+                        Luck = 5
+                    }
+                }
+            }
+        };
+
+    private static PartyMember ClonePartyMember(PartyMember source) =>
+        new()
+        {
+            Id = source.Id,
+            Name = source.Name,
+            Level = source.Level,
+            HP = source.HP,
+            MaxHP = source.MaxHP,
+            Stats = new StatsData
+            {
+                Strength = source.Stats.Strength,
+                Magic = source.Stats.Magic,
+                Agility = source.Stats.Agility,
+                Luck = source.Stats.Luck
+            }
+        };
 }
