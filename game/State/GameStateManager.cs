@@ -45,20 +45,45 @@ public class GameStateManager
         DiscoverArea(x, y);
     }
 
-    public void AdvanceFloor(int startX, int startY, int health, int maxHealth)
+    public void AdvanceFloor(int health, int maxHealth)
     {
         ActiveExpedition.CurrentFloor++;
         ActiveExpedition.CurrentNode = string.Empty;
-        ActiveExpedition.PlayerGridPosition = (startX, startY);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
         ActiveExpedition.FloorSeed = Random.Shared.Next();
+
+        // These states belong to the floor being left, not the expedition as a whole.
         ActiveExpedition.DiscoveredCells.Clear();
-        MarkDiscovered(startX, startY);
+        ActiveExpedition.CompletedNodeIds.Clear();
+        ActiveExpedition.DefeatedNodeIds.Clear();
 
         Campaign.HighestDepth = Math.Max(
             Campaign.HighestDepth,
             ActiveExpedition.CurrentFloor);
+    }
+
+    public void SetExpeditionPosition(int x, int y)
+    {
+        ActiveExpedition.PlayerGridPosition = (x, y);
+        DiscoverArea(x, y);
+    }
+
+    public void CommitExpeditionProgress()
+    {
+        foreach (PartyMember expeditionMember in ActiveExpedition.Party)
+        {
+            PartyMember? campaignMember = Campaign.PartyRoster
+                .FirstOrDefault(member => member.Id == expeditionMember.Id);
+
+            if (campaignMember == null)
+                continue;
+
+            campaignMember.Experience = expeditionMember.Experience;
+            campaignMember.Level = expeditionMember.Level;
+            campaignMember.EquippedGearIds =
+                new List<string>(expeditionMember.EquippedGearIds);
+        }
     }
 
     public void MarkDiscovered(int x, int y)
