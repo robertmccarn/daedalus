@@ -27,6 +27,7 @@ public class GameSession
             World.FloorSeed);
 
         SynchronizeExpedition();
+        RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
     }
 
