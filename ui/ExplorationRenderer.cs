@@ -9,9 +9,12 @@ public class ExplorationRenderer : IDisposable
     {
     }
 
-    public void Draw(Graphics graphics, GameWorld world)
+    public void Draw(
+        Graphics graphics,
+        GameWorld world,
+        Func<int, int, bool> isCellDiscovered)
     {
-        worldRenderer.Draw(graphics, world);
+        worldRenderer.Draw(graphics, world, isCellDiscovered);
         hudRenderer.Draw(graphics, world);
     }
 
