@@ -27,11 +27,13 @@ public class GameSession
             World.FloorSeed);
 
         SynchronizeExpedition();
+        ApplyGearBonuses();
     }
 
     public MoveResult MovePlayer(int deltaX, int deltaY)
     {
-        if (State != GameState.Exploration)
+        if (State != GameState.Exploration ||
+            StateManager.ActiveExpedition.ExtractionState != "Active")
             return MoveResult.Blocked;
 
         int targetX = World.Player.X + deltaX;
@@ -41,6 +43,11 @@ public class GameSession
         if (result == MoveResult.Moved)
         {
             StateManager.ActiveExpedition.TurnCount++;
+            UpkeepSystem.ApplyTurn(
+                StateManager.Campaign,
+                StateManager.ActiveExpedition);
+
+            RecordNodeVisit(targetX, targetY);
             SynchronizeExpedition();
         }
 
@@ -56,19 +63,66 @@ public class GameSession
 
     public void StartTestBattle()
     {
-        if (State == GameState.Exploration && World.Enemies.Count > 0)
+        if (State == GameState.Exploration &&
+            StateManager.ActiveExpedition.ExtractionState == "Active" &&
+            World.Enemies.Count > 0)
+        {
             StartBattle(World.Enemies[0]);
+        }
     }
 
     public void Interact()
     {
-        if (State != GameState.Exploration)
+        if (State != GameState.Exploration ||
+            StateManager.ActiveExpedition.ExtractionState != "Active")
             return;
 
-        InteractiveProp? prop = World.GetPropAt(World.Player.X, World.Player.Y);
-        if (prop != null)
+        InteractiveProp? prop = World.GetPropAt(
+            World.Player.X,
+            World.Player.Y);
+
+        if (prop is Chest chest)
         {
-            Message = prop.Interact();
+            Message = chest.Interact();
+
+            if (chest.IsOpen)
+            {
+                ExtractionSystem.ApplyReward(
+                    StateManager.Campaign,
+                    StateManager.ActiveExpedition,
+                    chest.Reward);
+
+                World.CompleteNodeAt(chest.X, chest.Y);
+                Message += " Supplies recovered.";
+            }
+
+            RecordNodeVisit(chest.X, chest.Y);
+            return;
+        }
+
+        if (prop is Terminal terminal)
+        {
+            bool wasActivated = terminal.IsActivated;
+            Message = terminal.Interact();
+
+            if (!wasActivated && terminal.IsActivated)
+            {
+                for (int i = 0; i < terminal.CoreReward.Quantity; i++)
+                {
+                    StateManager.Campaign.Cores.Add(new EnergyCore
+                    {
+                        Type = terminal.CoreReward.Type,
+                        Charge = terminal.CoreReward.Charge
+                    });
+                }
+
+                World.Player.Heal(terminal.HealAmount);
+                World.CompleteNodeAt(terminal.X, terminal.Y);
+                Message += $" Restored {terminal.HealAmount} HP.";
+            }
+
+            RecordNodeVisit(terminal.X, terminal.Y);
+            SynchronizeExpedition();
             return;
         }
 
@@ -83,8 +137,11 @@ public class GameSession
         Message = "There is nothing to interact with here.";
     }
 
-    public void SelectPreviousBattleCommand() => Battle?.SelectPreviousCommand();
-    public void SelectNextBattleCommand() => Battle?.SelectNextCommand();
+    public void SelectPreviousBattleCommand() =>
+        Battle?.SelectPreviousCommand();
+
+    public void SelectNextBattleCommand() =>
+        Battle?.SelectNextCommand();
 
     public void CancelBattle()
     {
@@ -97,21 +154,48 @@ public class GameSession
         if (Battle == null || State != GameState.Battle)
             return;
 
-        BattleResult result = Battle.PerformPlayerTurn(out _, out int enemyDamage);
+        BattleResult result = Battle.PerformPlayerTurn(
+            out _,
+            out int enemyDamage);
+
         SynchronizeExpedition();
         Message = Battle.CommandMessage;
 
         if (result == BattleResult.EnemyDefeated)
         {
-            World.BeginEnemyDeath(Battle.Enemy);
-            StateManager.Campaign.Gold += 10 * World.Floor;
+            Character defeatedEnemy = Battle.Enemy;
+            RewardBundle reward = ExpeditionRewardSystem.CreateCombatReward(
+                defeatedEnemy,
+                World.Floor);
+
+            PartyMember? partyMember = StateManager.ActiveExpedition.Party
+                .FirstOrDefault(member => member.Id == "arden");
+
+            if (partyMember != null)
+            {
+                ExpeditionRewardSystem.ApplyCombatReward(
+                    StateManager.Campaign,
+                    StateManager.ActiveExpedition,
+                    partyMember,
+                    reward);
+            }
+
+            World.BeginEnemyDeath(defeatedEnemy);
             EndBattle();
+
+            Message =
+                $"Victory. +{reward.Experience} XP, +{reward.Gold} gold, " +
+                $"+{reward.Cores.Sum(core => core.Quantity)} core, and drops recovered.";
+
+            ApplyGearBonuses();
             return;
         }
 
         if (result == BattleResult.PlayerDefeated)
         {
-            Message = $"{Battle.Enemy.Name} attacks for {enemyDamage} damage. You were defeated.";
+            Message =
+                $"{Battle.Enemy.Name} attacks for {enemyDamage} damage. You were defeated.";
+
             State = GameState.GameOver;
             StateManager.ActiveExpedition.ExtractionState = "Defeated";
             SynchronizeExpedition();
@@ -143,21 +227,49 @@ public class GameSession
             return false;
 
         ExpeditionState expedition = StateManager.ActiveExpedition;
-        World.RebuildFloor(expedition.FloorSeed, expedition.CurrentFloor);
-
-        World.Player.MoveTo(
-            expedition.PlayerGridPosition.X,
-            expedition.PlayerGridPosition.Y);
+        World.RebuildFloor(
+            expedition.FloorSeed,
+            expedition.CurrentFloor);
 
         ApplyPlayerState(expedition);
+        ApplyGearBonuses();
+
         State = GameState.Exploration;
         Battle = null;
         Message = "Expedition loaded.";
         return true;
     }
 
+    public bool ExtractExpedition()
+    {
+        if (!ExtractionSystem.Extract(StateManager))
+            return false;
+
+        State = GameState.Exploration;
+        Battle = null;
+        Message =
+            $"Expedition extracted at depth {StateManager.ActiveExpedition.CurrentFloor}. " +
+            $"Upkeep paid: {StateManager.ActiveExpedition.Upkeep}.";
+
+        return true;
+    }
+
+    public Gear? SynthesizeGear(string recipeId)
+    {
+        Recipe? recipe = StateManager.Campaign.Recipes
+            .FirstOrDefault(candidate => candidate.Id == recipeId);
+
+        if (recipe == null)
+            return null;
+
+        return SynthesisSystem.SynthesizeGear(
+            StateManager.Campaign,
+            recipe);
+    }
+
     private void StartBattle(Character enemy)
     {
+        ApplyGearBonuses();
         Battle = new BattleSystem(World.Player, enemy);
         State = GameState.Battle;
         Message = string.Empty;
@@ -179,10 +291,27 @@ public class GameSession
             World.Player.MAXHP);
 
         ExpeditionState expedition = StateManager.ActiveExpedition;
-        World.RebuildFloor(expedition.FloorSeed, expedition.CurrentFloor);
+        World.RebuildFloor(
+            expedition.FloorSeed,
+            expedition.CurrentFloor);
 
         ApplyPlayerState(expedition);
+        ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
+    }
+
+    private void RecordNodeVisit(int x, int y)
+    {
+        DungeonNode? node = World.GetNodeAt(x, y);
+        if (node == null)
+            return;
+
+        StateManager.ActiveExpedition.CurrentNode = node.Id;
+
+        if (!StateManager.ActiveExpedition.NodeHistory.Contains(node.Id))
+            StateManager.ActiveExpedition.NodeHistory.Add(node.Id);
+
+        DiscoverCell(x, y);
     }
 
     private void SynchronizeExpedition()
@@ -211,11 +340,45 @@ public class GameSession
             expedition.PlayerGridPosition.Y);
 
         int damage = World.Player.MAXHP - expedition.Health;
+
         if (damage > 0)
             World.Player.TakeDamage(damage);
         else if (damage < 0)
             World.Player.Heal(-damage);
 
         DiscoverCell(World.Player.X, World.Player.Y);
+    }
+
+    private void ApplyGearBonuses()
+    {
+        PartyMember? partyMember = StateManager.ActiveExpedition.Party
+            .FirstOrDefault(member => member.Id == "arden");
+
+        if (partyMember == null)
+        {
+            World.Player.SetEquipmentBonuses(0, 0);
+            return;
+        }
+
+        int attackBonus = 0;
+        int defenseBonus = 0;
+
+        foreach (string gearId in partyMember.EquippedGearIds)
+        {
+            Gear? gear = StateManager.Campaign.Gear
+                .FirstOrDefault(candidate => candidate.Id == gearId);
+
+            if (gear == null)
+                continue;
+
+            if (gear.Slot.Equals("Weapon", StringComparison.OrdinalIgnoreCase))
+                attackBonus += gear.Power;
+            else
+                defenseBonus += gear.Power;
+        }
+
+        World.Player.SetEquipmentBonuses(
+            attackBonus,
+            defenseBonus);
     }
 }
