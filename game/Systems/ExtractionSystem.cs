@@ -9,6 +9,8 @@ public static class ExtractionSystem
         if (expedition.ExtractionState == "Extracted")
             return false;
 
+        stateManager.CommitExpeditionProgress();
+
         InventorySystem.TransferCarriedInventoryToStash(
             stateManager.Campaign,
             expedition);
