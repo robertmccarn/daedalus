@@ -4,7 +4,7 @@ namespace Systemic.Engine.State;
 
 public static class SaveSystem
 {
-    private const int CurrentSchemaVersion = 1;
+    private const int CurrentSchemaVersion = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
