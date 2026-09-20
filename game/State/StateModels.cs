@@ -8,8 +8,14 @@ public class PartyMember
     public int Experience { get; set; }
     public int HP { get; set; }
     public int MaxHP { get; set; }
+    public int MP { get; set; }
+    public int MaxMP { get; set; }
     public StatsData Stats { get; set; } = new();
+    public int Morale { get; set; } = 100;
     public List<string> EquippedGearIds { get; set; } = new();
+    public List<string> Specializations { get; set; } = new();
+    public string SpriteId { get; set; } = string.Empty;
+    public string PortraitId { get; set; } = string.Empty;
 }
 
 public class StatsData

@@ -5,6 +5,7 @@ public class GameSession
     private readonly GameLogic logic;
 
     public GameWorld World { get; }
+    public PartyController Party { get; }
     public GameState State { get; private set; }
     public BattleSystem? Battle { get; private set; }
     public string Message { get; private set; }
@@ -17,15 +18,24 @@ public class GameSession
         State = GameState.Exploration;
         Message = string.Empty;
         StateManager = new GameStateManager();
+        Party = new PartyController(World);
 
         StateManager.StartNewExpedition(
             World.SpawnX,
             World.SpawnY,
-            World.Player.HP,
-            World.Player.MAXHP,
+            30,
+            30,
             World.Floor,
-            World.FloorSeed);
+            World.FloorSeed,
+            StateManager.Campaign.PartyRoster.Take(4).Select(member => member.Id).ToArray(),
+            StateManager.Campaign.PartyRoster[0].Id,
+            PartyFormationType.Column);
 
+        Party.Initialize(
+            StateManager.ActiveExpedition,
+            new GridPosition(World.SpawnX, World.SpawnY));
+
+        SyncCompatibilityPlayer();
         SynchronizeExpedition();
         RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
@@ -33,28 +43,47 @@ public class GameSession
 
     public MoveResult MovePlayer(int deltaX, int deltaY)
     {
+        CharacterDirection? direction = (deltaX, deltaY) switch
+        {
+            (0, -1) => CharacterDirection.Up,
+            (0, 1) => CharacterDirection.Down,
+            (-1, 0) => CharacterDirection.Left,
+            (1, 0) => CharacterDirection.Right,
+            _ => null
+        };
+
+        return direction.HasValue
+            ? MoveLeader(direction.Value)
+            : MoveResult.Blocked;
+    }
+
+    public MoveResult MoveLeader(CharacterDirection direction)
+    {
         if (State != GameState.Exploration ||
             StateManager.ActiveExpedition.ExtractionState != "Active")
             return MoveResult.Blocked;
 
-        int targetX = World.Player.X + deltaX;
-        int targetY = World.Player.Y + deltaY;
-        MoveResult result = logic.MovePlayer(World, targetX, targetY);
+        MoveResult result = Party.TryMoveLeader(
+            direction,
+            StateManager.ActiveExpedition);
 
         if (result == MoveResult.Moved)
         {
+            SyncCompatibilityPlayer();
             StateManager.ActiveExpedition.TurnCount++;
             UpkeepSystem.ApplyTurn(
                 StateManager.Campaign,
                 StateManager.ActiveExpedition);
 
-            RecordNodeVisit(targetX, targetY);
+            GridPosition position = Party.LeaderPosition;
+            RecordNodeVisit(position.X, position.Y);
             SynchronizeExpedition();
         }
 
         if (result == MoveResult.Encounter)
         {
-            Character? enemy = World.GetEnemyAt(targetX, targetY);
+            GridPosition target = GetAdjacentPosition(Party.LeaderPosition, direction);
+            Character? enemy = World.GetEnemyAt(target.X, target.Y);
             if (enemy != null)
                 StartBattle(enemy);
         }
@@ -78,9 +107,10 @@ public class GameSession
             StateManager.ActiveExpedition.ExtractionState != "Active")
             return;
 
+        GridPosition leaderPosition = Party.LeaderPosition;
         InteractiveProp? prop = World.GetPropAt(
-            World.Player.X,
-            World.Player.Y);
+            leaderPosition.X,
+            leaderPosition.Y);
 
         if (prop is Chest chest)
         {
@@ -93,6 +123,9 @@ public class GameSession
                     StateManager.Campaign,
                     StateManager.ActiveExpedition,
                     chest.Reward);
+                MoraleSystem.ApplyEvent(
+                    StateManager.ActiveExpedition,
+                    MoraleEventType.LootFound);
 
                 CompleteNode(chest.X, chest.Y);
                 Message += " Supplies recovered.";
@@ -117,16 +150,16 @@ public class GameSession
                     terminalReward);
 
                 World.Player.Heal(terminal.HealAmount);
+                SynchronizeExpedition();
                 CompleteNode(terminal.X, terminal.Y);
                 Message += $" Restored {terminal.HealAmount} HP.";
             }
 
             RecordNodeVisit(terminal.X, terminal.Y);
-            SynchronizeExpedition();
             return;
         }
 
-        Tile tile = logic.GetPlayerTile(World);
+        Tile tile = logic.GetTile(World, leaderPosition);
 
         if (tile.Type == TileType.StairsDown)
         {
@@ -169,7 +202,7 @@ public class GameSession
                 World.Floor);
 
             PartyMember? partyMember = StateManager.ActiveExpedition.Party
-                .FirstOrDefault(member => member.Id == "arden");
+                .FirstOrDefault(member => member.Id == Party.LeaderId);
 
             if (partyMember != null)
             {
@@ -178,6 +211,9 @@ public class GameSession
                     StateManager.ActiveExpedition,
                     partyMember,
                     reward);
+                MoraleSystem.ApplyEvent(
+                    StateManager.ActiveExpedition,
+                    MoraleEventType.EnemyDefeated);
             }
 
             World.BeginEnemyDeath(defeatedEnemy);
@@ -199,12 +235,16 @@ public class GameSession
 
             State = GameState.GameOver;
             StateManager.ActiveExpedition.ExtractionState = "Defeated";
+            Party.GetLeaderRuntime().IsDefeated = true;
             SynchronizeExpedition();
             return;
         }
 
         if (result == BattleResult.Escaped)
         {
+            MoraleSystem.ApplyEvent(
+                StateManager.ActiveExpedition,
+                MoraleEventType.Retreat);
             EndBattle();
             return;
         }
@@ -233,7 +273,12 @@ public class GameSession
             expedition.CurrentFloor);
         World.RestoreExpeditionState(expedition);
 
-        ApplyPlayerState(expedition);
+        Party.Load(
+            expedition,
+            new GridPosition(
+                expedition.PlayerGridPosition.X,
+                expedition.PlayerGridPosition.Y));
+        SyncCompatibilityPlayer();
         ApplyGearBonuses();
 
         State = GameState.Exploration;
@@ -248,9 +293,10 @@ public class GameSession
             StateManager.ActiveExpedition.ExtractionState != "Active")
             return false;
 
+        GridPosition leaderPosition = Party.LeaderPosition;
         DungeonNode? node = World.GetNodeAt(
-            World.Player.X,
-            World.Player.Y);
+            leaderPosition.X,
+            leaderPosition.Y);
 
         if (node?.Type != DungeonNodeType.Extraction)
         {
@@ -285,12 +331,13 @@ public class GameSession
             recipe);
     }
 
-    public bool EquipGear(string gearId, string partyMemberId = "arden")
+    public bool EquipGear(string gearId, string? partyMemberId = null)
     {
+        string targetId = partyMemberId ?? Party.LeaderId;
         bool equipped = InventorySystem.EquipGear(
             StateManager.Campaign,
             StateManager.ActiveExpedition,
-            partyMemberId,
+            targetId,
             gearId);
 
         if (equipped)
@@ -301,6 +348,7 @@ public class GameSession
 
     private void StartBattle(Character enemy)
     {
+        SyncCompatibilityPlayer();
         ApplyGearBonuses();
         Battle = new BattleSystem(World.Player, enemy);
         State = GameState.Battle;
@@ -312,24 +360,29 @@ public class GameSession
         State = GameState.Exploration;
         Battle = null;
         Message = string.Empty;
+        SyncCompatibilityPlayer();
     }
 
     private void AdvanceToNextFloor()
     {
+        PartyMember leader = GetLeaderState() ?? throw new InvalidOperationException("Expedition leader is missing.");
+
         StateManager.AdvanceFloor(
-            World.Player.HP,
-            World.Player.MAXHP);
+            leader.HP,
+            leader.MaxHP);
 
         ExpeditionState expedition = StateManager.ActiveExpedition;
         World.RebuildFloor(
             expedition.FloorSeed,
             expedition.CurrentFloor);
 
+        Party.ReformForFloor(
+            expedition,
+            new GridPosition(World.SpawnX, World.SpawnY));
+        SyncCompatibilityPlayer();
         StateManager.SetExpeditionPosition(
             World.SpawnX,
             World.SpawnY);
-
-        ApplyPlayerState(expedition);
         RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
@@ -368,43 +421,35 @@ public class GameSession
 
     private void SynchronizeExpedition()
     {
+        PartyMember? leader = GetLeaderState();
+        if (leader == null)
+            return;
+
         StateManager.SynchronizeExpedition(
-            World.Player.X,
-            World.Player.Y,
+            Party.LeaderPosition.X,
+            Party.LeaderPosition.Y,
             World.Player.HP,
             World.Player.MAXHP);
 
-        PartyMember? playerState = StateManager.ActiveExpedition.Party
-            .FirstOrDefault(member => member.Id == "arden");
-
-        if (playerState != null)
-        {
-            playerState.HP = World.Player.HP;
-            playerState.MaxHP = World.Player.MAXHP;
-            playerState.Level = World.Player.Level;
-        }
+        leader.HP = World.Player.HP;
+        leader.MaxHP = World.Player.MAXHP;
+        leader.Level = World.Player.Level;
     }
 
-    private void ApplyPlayerState(ExpeditionState expedition)
+    private void SyncCompatibilityPlayer()
     {
-        World.Player.MoveTo(
-            expedition.PlayerGridPosition.X,
-            expedition.PlayerGridPosition.Y);
+        PartyMember? leader = GetLeaderState();
+        if (leader == null)
+            return;
 
-        int damage = World.Player.MAXHP - expedition.Health;
-
-        if (damage > 0)
-            World.Player.TakeDamage(damage);
-        else if (damage < 0)
-            World.Player.Heal(-damage);
-
-        DiscoverCell(World.Player.X, World.Player.Y);
+        World.SyncPlayerFromPartyMember(
+            leader,
+            Party.LeaderPosition);
     }
 
     private void ApplyGearBonuses()
     {
-        PartyMember? partyMember = StateManager.ActiveExpedition.Party
-            .FirstOrDefault(member => member.Id == "arden");
+        PartyMember? partyMember = GetLeaderState();
 
         if (partyMember == null)
         {
@@ -433,4 +478,18 @@ public class GameSession
             attackBonus,
             defenseBonus);
     }
+
+    private PartyMember? GetLeaderState() =>
+        StateManager.ActiveExpedition.Party
+            .FirstOrDefault(member => member.Id == Party.LeaderId);
+
+    private static GridPosition GetAdjacentPosition(
+        GridPosition position,
+        CharacterDirection direction) => direction switch
+        {
+            CharacterDirection.Up => new GridPosition(position.X, position.Y - 1),
+            CharacterDirection.Down => new GridPosition(position.X, position.Y + 1),
+            CharacterDirection.Left => new GridPosition(position.X - 1, position.Y),
+            _ => new GridPosition(position.X + 1, position.Y)
+        };
 }

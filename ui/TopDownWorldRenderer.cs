@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using Systemic.Engine.State;
 
 public class TopDownWorldRenderer
 {
@@ -12,31 +13,35 @@ public class TopDownWorldRenderer
     public void Draw(
         Graphics graphics,
         GameWorld world,
+        PartyController party,
+        ExpeditionState expedition,
         Func<int, int, bool> isCellDiscovered)
     {
         graphics.Clear(Color.Black);
         graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
         graphics.PixelOffsetMode = PixelOffsetMode.Half;
 
-        int cameraX = world.Player.X * TileSize - ViewportCenterX;
-        int cameraY = world.Player.Y * TileSize - ViewportCenterY;
+        GridPosition leader = party.LeaderPosition;
+        int cameraX = leader.X * TileSize - ViewportCenterX;
+        int cameraY = leader.Y * TileSize - ViewportCenterY;
 
-        DrawTiles(graphics, world, cameraX, cameraY, isCellDiscovered);
+        DrawTiles(graphics, world, leader, cameraX, cameraY, isCellDiscovered);
         DrawProps(graphics, world, cameraX, cameraY, isCellDiscovered);
-        DrawCharacters(graphics, world, cameraX, cameraY, isCellDiscovered);
+        DrawCharacters(graphics, world, party, expedition, cameraX, cameraY, isCellDiscovered);
     }
 
     private static void DrawTiles(
         Graphics graphics,
         GameWorld world,
+        GridPosition leader,
         int cameraX,
         int cameraY,
         Func<int, int, bool> isCellDiscovered)
     {
-        int minX = Math.Max(0, world.Player.X - VisibleRadiusX);
-        int maxX = Math.Min(world.Dungeon.GetLength(1) - 1, world.Player.X + VisibleRadiusX);
-        int minY = Math.Max(0, world.Player.Y - VisibleRadiusY);
-        int maxY = Math.Min(world.Dungeon.GetLength(0) - 1, world.Player.Y + VisibleRadiusY);
+        int minX = Math.Max(0, leader.X - VisibleRadiusX);
+        int maxX = Math.Min(world.Dungeon.GetLength(1) - 1, leader.X + VisibleRadiusX);
+        int minY = Math.Max(0, leader.Y - VisibleRadiusY);
+        int maxY = Math.Min(world.Dungeon.GetLength(0) - 1, leader.Y + VisibleRadiusY);
 
         for (int y = minY; y <= maxY; y++)
         {
@@ -86,17 +91,61 @@ public class TopDownWorldRenderer
     private static void DrawCharacters(
         Graphics graphics,
         GameWorld world,
+        PartyController party,
+        ExpeditionState expedition,
         int cameraX,
         int cameraY,
         Func<int, int, bool> isCellDiscovered)
     {
-        DrawCharacter(graphics, world.Player, cameraX, cameraY, Color.Cyan, isCellDiscovered);
+        foreach (PartyRenderData member in party.GetRenderData(expedition)
+                     .OrderBy(data => data.Position.Y)
+                     .ThenBy(data => data.Position.X)
+                     .ThenBy(data => data.PartySlot))
+        {
+            DrawPartyMember(
+                graphics,
+                member,
+                cameraX,
+                cameraY,
+                isCellDiscovered);
+        }
 
         foreach (Character enemy in world.Enemies)
             DrawCharacter(graphics, enemy, cameraX, cameraY, Color.IndianRed, isCellDiscovered);
 
         foreach (Character enemy in world.DefeatedEnemies)
             DrawCharacter(graphics, enemy, cameraX, cameraY, Color.DarkRed, isCellDiscovered);
+    }
+
+    private static void DrawPartyMember(
+        Graphics graphics,
+        PartyRenderData member,
+        int cameraX,
+        int cameraY,
+        Func<int, int, bool> isCellDiscovered)
+    {
+        int screenX = member.Position.X * TileSize - cameraX;
+        int screenY = member.Position.Y * TileSize - cameraY;
+
+        if (!IsVisible(screenX, screenY) ||
+            !isCellDiscovered(member.Position.X, member.Position.Y))
+            return;
+
+        Color color = member.IsLeader
+            ? Color.Cyan
+            : member.PartySlot switch
+            {
+                1 => Color.LightGreen,
+                2 => Color.Gold,
+                _ => Color.Violet
+            };
+
+        Rectangle body = new(screenX + 5, screenY + 3, TileSize - 10, TileSize - 6);
+        using Brush brush = new SolidBrush(color);
+        graphics.FillRectangle(brush, body);
+
+        using Pen outline = new(Color.Black, 2);
+        graphics.DrawRectangle(outline, body);
     }
 
     private static void DrawCharacter(

@@ -1,4 +1,5 @@
 using System.Drawing;
+using Systemic.Engine.State;
 
 public class ExplorationRenderer : IDisposable
 {
@@ -12,10 +13,12 @@ public class ExplorationRenderer : IDisposable
     public void Draw(
         Graphics graphics,
         GameWorld world,
+        PartyController party,
+        ExpeditionState expedition,
         Func<int, int, bool> isCellDiscovered)
     {
-        worldRenderer.Draw(graphics, world, isCellDiscovered);
-        hudRenderer.Draw(graphics, world);
+        worldRenderer.Draw(graphics, world, party, expedition, isCellDiscovered);
+        hudRenderer.Draw(graphics, party, expedition);
     }
 
     public void Dispose()

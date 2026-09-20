@@ -18,8 +18,11 @@ public class ExpeditionState
     public List<string> DefeatedNodeIds { get; set; } = new();
     public string ExtractionState { get; set; } = "Active";
     public List<PartyMember> Party { get; set; } = new();
+    public string LeaderId { get; set; } = string.Empty;
+    public PartyFormationType Formation { get; set; } = PartyFormationType.Column;
     public string CurrentNode { get; set; } = "Start";
     public int FloorSeed { get; set; }
+    // Compatibility field: this is the persisted leader position.
     public (int X, int Y) PlayerGridPosition { get; set; }
 
     // Compatibility surface for the prototype's old state API.

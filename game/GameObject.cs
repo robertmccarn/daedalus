@@ -1,3 +1,5 @@
+using Systemic.Engine.State;
+
 public class GameObject
 {
     public string Name { get; private set; }
@@ -49,6 +51,19 @@ public class Character : GameObject
     {
         AttackBonus = Math.Max(0, attackBonus);
         DefenseBonus = Math.Max(0, defenseBonus);
+    }
+
+    public void SyncFromState(PartyMember member, GridPosition position)
+    {
+        MoveTo(position.X, position.Y);
+        MAXHP = Math.Max(1, member.MaxHP);
+        HP = Math.Clamp(member.HP, 0, MAXHP);
+        Level = Math.Max(1, member.Level);
+        Stats = new Stats(
+            member.Stats.Strength,
+            member.Stats.Magic,
+            member.Stats.Agility,
+            member.Stats.Luck);
     }
 
     public void TakeDamage(int damage)

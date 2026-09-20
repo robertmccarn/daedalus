@@ -4,7 +4,7 @@ namespace Systemic.Engine.State;
 
 public static class SaveSystem
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -53,6 +53,7 @@ public static class SaveSystem
 
             campaign = data.Campaign ?? new CampaignState();
             expedition = data.Expedition ?? new ExpeditionState();
+            MigrateToCurrent(data.SchemaVersion, campaign, expedition);
             return true;
         }
         catch (JsonException)
@@ -63,6 +64,56 @@ public static class SaveSystem
         {
             return false;
         }
+    }
+
+    private static void MigrateToCurrent(
+        int schemaVersion,
+        CampaignState campaign,
+        ExpeditionState expedition)
+    {
+        if (schemaVersion >= CurrentSchemaVersion)
+            return;
+
+        if (schemaVersion <= 3)
+            MigrateSchema3To4(campaign, expedition);
+    }
+
+    private static void MigrateSchema3To4(
+        CampaignState campaign,
+        ExpeditionState expedition)
+    {
+        foreach (PartyMember member in campaign.PartyRoster)
+        {
+            member.Morale = 100;
+            member.MP = 10;
+            member.MaxMP = 10;
+            member.Specializations ??= new List<string>();
+            member.EquippedGearIds ??= new List<string>();
+            member.Stats ??= new StatsData();
+        }
+
+        foreach (PartyMember member in expedition.Party)
+        {
+            member.Morale = 100;
+            member.MP = 10;
+            member.MaxMP = 10;
+            member.Specializations ??= new List<string>();
+            member.EquippedGearIds ??= new List<string>();
+            member.Stats ??= new StatsData();
+        }
+
+        if (expedition.Party.Count > 0)
+        {
+            if (string.IsNullOrWhiteSpace(expedition.LeaderId) ||
+                expedition.Party.All(member => member.Id != expedition.LeaderId))
+            {
+                expedition.LeaderId = expedition.Party[0].Id;
+            }
+        }
+
+        expedition.Formation = Enum.IsDefined(expedition.Formation)
+            ? expedition.Formation
+            : PartyFormationType.Column;
     }
 
     private sealed class SaveData

@@ -17,8 +17,17 @@ public class GameStateManager
         int health,
         int maxHealth,
         int floor = 1,
-        int? floorSeed = null)
+        int? floorSeed = null,
+        IReadOnlyCollection<string>? selectedMemberIds = null,
+        string? leaderId = null,
+        PartyFormationType formation = PartyFormationType.Column)
     {
+        List<PartyMember> selected = SelectPartyMembers(selectedMemberIds);
+        string selectedLeaderId = leaderId ?? selected[0].Id;
+
+        if (selected.All(member => member.Id != selectedLeaderId))
+            throw new ArgumentException("Leader must be one of the selected party members.", nameof(leaderId));
+
         ActiveExpedition = new ExpeditionState
         {
             CurrentFloor = floor,
@@ -26,15 +35,34 @@ public class GameStateManager
             MaxHealth = maxHealth,
             PlayerGridPosition = (startX, startY),
             FloorSeed = floorSeed ?? Random.Shared.Next(),
-            Party = Campaign.PartyRoster.Select(ClonePartyMember).ToList()
+            Party = selected,
+            LeaderId = selectedLeaderId,
+            Formation = formation
         };
+
+        PartyMember leader = ActiveExpedition.Party.First(member => member.Id == selectedLeaderId);
+        leader.HP = Math.Clamp(health, 0, Math.Max(health, leader.MaxHP));
+        leader.MaxHP = Math.Max(leader.MaxHP, maxHealth);
+        ActiveExpedition.Health = leader.HP;
+        ActiveExpedition.MaxHealth = leader.MaxHP;
 
         DiscoverArea(startX, startY);
     }
 
     public void StartNewExpedition()
     {
-        StartNewExpedition(26, 5, 30, 30);
+        IReadOnlyCollection<string> selected = Campaign.PartyRoster
+            .Take(Math.Min(4, Campaign.PartyRoster.Count))
+            .Select(member => member.Id)
+            .ToArray();
+
+        StartNewExpedition(
+            26,
+            5,
+            30,
+            30,
+            selectedMemberIds: selected,
+            leaderId: Campaign.PartyRoster.FirstOrDefault()?.Id);
     }
 
     public void SynchronizeExpedition(int x, int y, int health, int maxHealth)
@@ -42,6 +70,13 @@ public class GameStateManager
         ActiveExpedition.PlayerGridPosition = (x, y);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
+        PartyMember? leader = ActiveExpedition.Party
+            .FirstOrDefault(member => member.Id == ActiveExpedition.LeaderId);
+        if (leader != null)
+        {
+            leader.HP = health;
+            leader.MaxHP = maxHealth;
+        }
         DiscoverArea(x, y);
     }
 
@@ -53,7 +88,6 @@ public class GameStateManager
         ActiveExpedition.MaxHealth = maxHealth;
         ActiveExpedition.FloorSeed = Random.Shared.Next();
 
-        // These states belong to the floor being left, not the expedition as a whole.
         ActiveExpedition.DiscoveredCells.Clear();
         ActiveExpedition.CompletedNodeIds.Clear();
         ActiveExpedition.DefeatedNodeIds.Clear();
@@ -81,6 +115,9 @@ public class GameStateManager
 
             campaignMember.Experience = expeditionMember.Experience;
             campaignMember.Level = expeditionMember.Level;
+            campaignMember.Stats = CloneStats(expeditionMember.Stats);
+            campaignMember.Morale = expeditionMember.Morale;
+            campaignMember.Specializations = new List<string>(expeditionMember.Specializations);
             campaignMember.EquippedGearIds =
                 new List<string>(expeditionMember.EquippedGearIds);
         }
@@ -147,7 +184,36 @@ public class GameStateManager
                 new List<string>(campaignMember.EquippedGearIds);
         }
 
+        if (ActiveExpedition.Party.Count > 0 &&
+            ActiveExpedition.Party.All(member => member.Id != ActiveExpedition.LeaderId))
+        {
+            ActiveExpedition.LeaderId = ActiveExpedition.Party[0].Id;
+        }
+
         return true;
+    }
+
+    private List<PartyMember> SelectPartyMembers(IReadOnlyCollection<string>? selectedMemberIds)
+    {
+        IReadOnlyCollection<string> ids = selectedMemberIds ??
+            Campaign.PartyRoster.Take(Math.Min(4, Campaign.PartyRoster.Count)).Select(member => member.Id).ToArray();
+
+        if (ids.Count is < 1 or > 4)
+            throw new ArgumentException("An expedition party must contain between one and four members.", nameof(selectedMemberIds));
+
+        if (ids.Count != ids.Distinct(StringComparer.Ordinal).Count())
+            throw new ArgumentException("Expedition party member IDs must be unique.", nameof(selectedMemberIds));
+
+        List<PartyMember> selected = new();
+        foreach (string id in ids)
+        {
+            PartyMember? source = Campaign.PartyRoster.FirstOrDefault(member => member.Id == id);
+            if (source == null)
+                throw new ArgumentException($"Party member '{id}' does not exist in the campaign roster.", nameof(selectedMemberIds));
+            selected.Add(ClonePartyMember(source));
+        }
+
+        return selected;
     }
 
     private static CampaignState CreateDefaultCampaign()
@@ -156,21 +222,11 @@ public class GameStateManager
         {
             PartyRoster = new()
             {
-                new PartyMember
-                {
-                    Id = "arden",
-                    Name = "Arden",
-                    Level = 1,
-                    HP = 30,
-                    MaxHP = 30,
-                    Stats = new StatsData
-                    {
-                        Strength = 8,
-                        Magic = 3,
-                        Agility = 6,
-                        Luck = 5
-                    }
-                }
+                CreatePartyMember("arden", "Arden", 30, 8, 3, 6, 5, "arden"),
+                CreatePartyMember("lyra", "Lyra", 24, 4, 9, 7, 6, "lyra"),
+                CreatePartyMember("marek", "Marek", 36, 10, 2, 3, 4, "marek"),
+                CreatePartyMember("sera", "Sera", 26, 6, 7, 9, 8, "sera"),
+                CreatePartyMember("voss", "Voss", 28, 7, 5, 5, 10, "voss")
             }
         };
 
@@ -199,6 +255,36 @@ public class GameStateManager
         return campaign;
     }
 
+    private static PartyMember CreatePartyMember(
+        string id,
+        string name,
+        int hp,
+        int strength,
+        int magic,
+        int agility,
+        int luck,
+        string spriteId) =>
+        new()
+        {
+            Id = id,
+            Name = name,
+            Level = 1,
+            HP = hp,
+            MaxHP = hp,
+            MP = 10,
+            MaxMP = 10,
+            Morale = 100,
+            SpriteId = spriteId,
+            PortraitId = spriteId,
+            Stats = new StatsData
+            {
+                Strength = strength,
+                Magic = magic,
+                Agility = agility,
+                Luck = luck
+            }
+        };
+
     private static PartyMember ClonePartyMember(PartyMember source) =>
         new()
         {
@@ -208,13 +294,22 @@ public class GameStateManager
             Experience = source.Experience,
             HP = source.HP,
             MaxHP = source.MaxHP,
-            Stats = new StatsData
-            {
-                Strength = source.Stats.Strength,
-                Magic = source.Stats.Magic,
-                Agility = source.Stats.Agility,
-                Luck = source.Stats.Luck
-            },
-            EquippedGearIds = new List<string>(source.EquippedGearIds)
+            MP = source.MP,
+            MaxMP = source.MaxMP,
+            Morale = source.Morale,
+            Stats = CloneStats(source.Stats),
+            EquippedGearIds = new List<string>(source.EquippedGearIds),
+            Specializations = new List<string>(source.Specializations),
+            SpriteId = source.SpriteId,
+            PortraitId = source.PortraitId
+        };
+
+    private static StatsData CloneStats(StatsData source) =>
+        new()
+        {
+            Strength = source.Strength,
+            Magic = source.Magic,
+            Agility = source.Agility,
+            Luck = source.Luck
         };
 }

@@ -1,4 +1,5 @@
 using System.Drawing;
+using Systemic.Engine.State;
 
 public class ExplorationHudRenderer : IDisposable
 {
@@ -6,28 +7,41 @@ public class ExplorationHudRenderer : IDisposable
     private readonly Font titleFont = new(FontFamily.GenericMonospace, 20);
     private readonly Font bottomFont = new(FontFamily.GenericMonospace, 14);
 
-    public void Draw(Graphics graphics, GameWorld world)
+    public void Draw(Graphics graphics, PartyController party, ExpeditionState expedition)
     {
         const int sidebarX = 780;
         graphics.DrawLine(Pens.White, sidebarX, 20, sidebarX, 620);
         float x = sidebarX + 25;
         float y = 30;
-        graphics.DrawString("STATUS", titleFont, Brushes.White, x, y);
+        graphics.DrawString("PARTY", titleFont, Brushes.White, x, y);
+
+        PartyMember? leader = expedition.Party
+            .FirstOrDefault(member => member.Id == party.LeaderId);
+
+        if (leader == null)
+            return;
 
         graphics.FillRectangle(Brushes.DarkSlateBlue, x, y + 35, 120, 120);
         graphics.DrawRectangle(Pens.White, x, y + 35, 120, 120);
-        graphics.DrawString(world.Player.Name, uiFont, Brushes.White, x + 12, y + 85);
+        graphics.DrawString(leader.Name, uiFont, Brushes.White, x + 12, y + 85);
 
         y += 165;
-        graphics.DrawString(world.Player.Name, titleFont, Brushes.Red, x, y);
+        graphics.DrawString(leader.Name, titleFont, Brushes.Red, x, y);
         y += 35;
-        graphics.DrawString($"LV {world.Player.Level}", uiFont, Brushes.White, x, y);
+        graphics.DrawString($"LV {leader.Level}", uiFont, Brushes.White, x, y);
         y += 30;
-        graphics.DrawString($"HP {world.Player.HP}/{world.Player.MAXHP}", uiFont, Brushes.White, x, y);
-        y += 45;
+        graphics.DrawString($"HP {leader.HP}/{leader.MaxHP}", uiFont, Brushes.White, x, y);
+        y += 30;
+        graphics.DrawString($"MORALE {leader.Morale}", uiFont, Brushes.White, x, y);
+        y += 40;
         graphics.DrawLine(Pens.White, x, y, x + 220, y);
         y += 25;
-        graphics.DrawString($"Position: ({world.Player.X}, {world.Player.Y})", uiFont, Brushes.White, x, y);
+        GridPosition position = party.LeaderPosition;
+        graphics.DrawString($"Position: ({position.X}, {position.Y})", uiFont, Brushes.White, x, y);
+        y += 30;
+        graphics.DrawString($"Party: {expedition.Party.Count}/4", uiFont, Brushes.White, x, y);
+        y += 30;
+        graphics.DrawString($"Formation: {expedition.Formation}", uiFont, Brushes.White, x, y);
 
         const int bottomY = 640;
         graphics.DrawLine(Pens.White, 20, bottomY, 1080, bottomY);

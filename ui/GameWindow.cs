@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using Systemic.Engine.State;
 
 public class GameWindow : Form
 {
@@ -25,7 +26,11 @@ public class GameWindow : Form
 
         Paint += DrawGame;
         KeyDown += HandleKeyDown;
-        renderTimer.Tick += (_, _) => Invalidate();
+        renderTimer.Tick += (_, _) =>
+        {
+            session.Party.AdvanceAnimation();
+            Invalidate();
+        };
         renderTimer.Start();
     }
 
@@ -38,9 +43,7 @@ public class GameWindow : Form
         }
 
         if (session.State == GameState.Exploration)
-        {
             HandleExplorationInput(e);
-        }
     }
 
     private void HandleExplorationInput(KeyEventArgs e)
@@ -72,18 +75,18 @@ public class GameWindow : Form
             return;
         }
 
-        (int deltaX, int deltaY) = e.KeyCode switch
+        CharacterDirection? direction = e.KeyCode switch
         {
-            Keys.W => (0, -1),
-            Keys.S => (0, 1),
-            Keys.A => (-1, 0),
-            Keys.D => (1, 0),
-            _ => (0, 0)
+            Keys.W => CharacterDirection.Up,
+            Keys.S => CharacterDirection.Down,
+            Keys.A => CharacterDirection.Left,
+            Keys.D => CharacterDirection.Right,
+            _ => null
         };
 
-        if (deltaX != 0 || deltaY != 0)
+        if (direction.HasValue)
         {
-            session.MovePlayer(deltaX, deltaY);
+            session.MoveLeader(direction.Value);
             Invalidate();
         }
     }
@@ -116,7 +119,12 @@ public class GameWindow : Form
 
     private void ShowStats()
     {
-        using StatsWindow statsWindow = new(session.World.Player);
+        PartyMember? leader = session.StateManager.ActiveExpedition.Party
+            .FirstOrDefault(member => member.Id == session.Party.LeaderId);
+        if (leader == null)
+            return;
+
+        using StatsWindow statsWindow = new(leader);
         statsWindow.ShowDialog(this);
     }
 
@@ -127,6 +135,8 @@ public class GameWindow : Form
         renderer.Draw(
             e.Graphics,
             session.World,
+            session.Party,
+            session.StateManager.ActiveExpedition,
             session.State,
             battle?.Enemy,
             session.Message,

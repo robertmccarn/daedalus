@@ -7,6 +7,7 @@ public class GameWorld
     public const int RoomCount = 10;
 
     public Tile[,] Dungeon { get; private set; } = null!;
+    // Compatibility bridge for the current battle system. PartyController is the authoritative party position.
     public Character Player { get; private set; } = null!;
     public List<Character> Enemies { get; private set; } = new();
     public List<Character> DefeatedEnemies { get; private set; } = new();
@@ -60,6 +61,11 @@ public class GameWorld
         CreateEnemies();
         CreateProps();
         CreateNodes();
+    }
+
+    public void SyncPlayerFromPartyMember(PartyMember member, GridPosition position)
+    {
+        Player.SyncFromState(member, position);
     }
 
     public bool IsWalkable(int x, int y)

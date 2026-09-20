@@ -1,5 +1,5 @@
-﻿using System.Drawing;
-
+using System.Drawing;
+using Systemic.Engine.State;
 
 public class GameRenderer : IDisposable
 {
@@ -7,33 +7,25 @@ public class GameRenderer : IDisposable
     private readonly BattleRenderer battleRenderer;
     private readonly GameOverRenderer gameOverRenderer;
 
-
-    public GameRenderer(
-        GameWorld world)
+    public GameRenderer(GameWorld world)
     {
-        explorationRenderer =
-            new ExplorationRenderer(
-                world);
-
-        battleRenderer =
-            new BattleRenderer();
-
-        gameOverRenderer =
-            new GameOverRenderer();
+        explorationRenderer = new ExplorationRenderer(world);
+        battleRenderer = new BattleRenderer();
+        gameOverRenderer = new GameOverRenderer();
     }
-
 
     public void Draw(
         Graphics graphics,
         GameWorld world,
+        PartyController party,
+        ExpeditionState expedition,
         GameState gameState,
         Character? battleEnemy,
         string message,
         BattleCommand selectedCommand,
         Func<int, int, bool> isCellDiscovered)
     {
-        if (gameState ==
-            GameState.Battle)
+        if (gameState == GameState.Battle)
         {
             battleRenderer.Draw(
                 graphics,
@@ -41,7 +33,6 @@ public class GameRenderer : IDisposable
                 battleEnemy,
                 message,
                 selectedCommand);
-
             return;
         }
 
@@ -54,9 +45,10 @@ public class GameRenderer : IDisposable
         explorationRenderer.Draw(
             graphics,
             world,
+            party,
+            expedition,
             isCellDiscovered);
     }
-
 
     public void Dispose()
     {
