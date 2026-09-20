@@ -130,7 +130,8 @@ public class GameWindow : Form
             session.State,
             battle?.Enemy,
             session.Message,
-            battle?.SelectedCommand ?? BattleCommand.Attack);
+            battle?.SelectedCommand ?? BattleCommand.Attack,
+            session.IsCellDiscovered);
     }
 
     protected override void Dispose(bool disposing)
