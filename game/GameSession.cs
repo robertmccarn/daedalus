@@ -317,8 +317,6 @@ public class GameSession
     private void AdvanceToNextFloor()
     {
         StateManager.AdvanceFloor(
-            World.SpawnX,
-            World.SpawnY,
             World.Player.HP,
             World.Player.MAXHP);
 
@@ -326,6 +324,10 @@ public class GameSession
         World.RebuildFloor(
             expedition.FloorSeed,
             expedition.CurrentFloor);
+
+        StateManager.SetExpeditionPosition(
+            World.SpawnX,
+            World.SpawnY);
 
         ApplyPlayerState(expedition);
         RecordNodeVisit(World.SpawnX, World.SpawnY);
