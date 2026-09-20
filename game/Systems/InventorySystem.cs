@@ -99,6 +99,7 @@ public static class InventorySystem
 
     public static bool EquipGear(
         CampaignState campaign,
+        ExpeditionState expedition,
         string partyMemberId,
         string gearId)
     {
@@ -115,6 +116,17 @@ public static class InventorySystem
             campaign.Gear.FirstOrDefault(item => item.Id == id)?.Slot == gear.Slot);
 
         member.EquippedGearIds.Add(gear.Id);
+
+        PartyMember? expeditionMember = expedition.Party
+            .FirstOrDefault(candidate => candidate.Id == partyMemberId);
+
+        if (expeditionMember != null)
+        {
+            expeditionMember.EquippedGearIds.RemoveAll(id =>
+                campaign.Gear.FirstOrDefault(item => item.Id == id)?.Slot == gear.Slot);
+            expeditionMember.EquippedGearIds.Add(gear.Id);
+        }
+
         return true;
     }
 
@@ -125,6 +137,17 @@ public static class InventorySystem
         foreach (InventoryItem item in expedition.CarriedInventory)
             AddToStash(campaign, item);
 
+        foreach (Material material in expedition.CarriedMaterials)
+            AddMaterial(campaign, material.Id, material.Name, material.Quantity);
+
+        campaign.Gear.AddRange(expedition.CarriedGear);
+        campaign.Cores.AddRange(expedition.CarriedCores);
+        campaign.Gold += expedition.CarriedGold;
+
         expedition.CarriedInventory.Clear();
+        expedition.CarriedMaterials.Clear();
+        expedition.CarriedGear.Clear();
+        expedition.CarriedCores.Clear();
+        expedition.CarriedGold = 0;
     }
 }
