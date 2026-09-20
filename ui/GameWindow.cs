@@ -51,6 +51,13 @@ public class GameWindow : Form
             return;
         }
 
+        if (e.KeyCode == Keys.X)
+        {
+            session.ExtractExpedition();
+            Invalidate();
+            return;
+        }
+
         if (e.KeyCode == Keys.B)
         {
             session.StartTestBattle();
