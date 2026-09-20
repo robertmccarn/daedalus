@@ -226,6 +226,7 @@ public class BattleSystem
 
         int damage =
             Player.Stats.Strength +
+            Player.AttackBonus +
             basicAttack.Power;
 
         Enemy.TakeDamage(
@@ -273,7 +274,8 @@ public class BattleSystem
 
         int damage =
             Enemy.Stats.Strength +
-            basicAttack.Power;
+            basicAttack.Power -
+            Player.DefenseBonus;
 
         if (defending)
         {
@@ -283,6 +285,8 @@ public class BattleSystem
             defending =
                 false;
         }
+
+        damage = Math.Max(0, damage);
 
         Player.TakeDamage(
             damage);
