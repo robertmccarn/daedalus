@@ -5,9 +5,11 @@ public class PartyMember
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = string.Empty;
     public int Level { get; set; } = 1;
+    public int Experience { get; set; }
     public int HP { get; set; }
     public int MaxHP { get; set; }
     public StatsData Stats { get; set; } = new();
+    public List<string> EquippedGearIds { get; set; } = new();
 }
 
 public class StatsData
@@ -38,7 +40,11 @@ public class Recipe
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = string.Empty;
     public List<string> Ingredients { get; set; } = new();
+    public Dictionary<string, int> IngredientQuantities { get; set; } = new();
     public string ResultItemId { get; set; } = string.Empty;
+    public string ResultKind { get; set; } = "Item";
+    public string ResultSlot { get; set; } = string.Empty;
+    public int ResultPower { get; set; }
 }
 
 public class EnergyCore
