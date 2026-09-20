@@ -106,6 +106,47 @@ public class GameWorld
         CompleteNodeAt(enemy.X, enemy.Y);
     }
 
+    public void RestoreExpeditionState(ExpeditionState expedition)
+    {
+        foreach (string nodeId in expedition.CompletedNodeIds)
+        {
+            DungeonNode? node = Nodes.FirstOrDefault(candidate => candidate.Id == nodeId);
+            if (node == null)
+                continue;
+
+            node.IsCompleted = true;
+
+            InteractiveProp? prop = GetPropAt(node.X, node.Y);
+            switch (prop)
+            {
+                case Chest chest:
+                    chest.RestoreOpen();
+                    break;
+                case Terminal terminal:
+                    terminal.RestoreActivated();
+                    break;
+            }
+
+            StaticUnit? unit = GetStaticUnitAt(node.X, node.Y);
+            unit?.Activate();
+        }
+
+        foreach (string nodeId in expedition.DefeatedNodeIds)
+        {
+            DungeonNode? node = Nodes.FirstOrDefault(candidate => candidate.Id == nodeId);
+            if (node == null || node.Type != DungeonNodeType.Combat)
+                continue;
+
+            Character? enemy = GetEnemyAt(node.X, node.Y);
+            if (enemy != null)
+            {
+                Enemies.Remove(enemy);
+                DefeatedEnemies.Add(enemy);
+                node.IsCompleted = true;
+            }
+        }
+    }
+
     private void CreateEnemies()
     {
         Character goblin = new(
