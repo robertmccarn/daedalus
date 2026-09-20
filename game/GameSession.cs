@@ -94,7 +94,7 @@ public class GameSession
                     StateManager.ActiveExpedition,
                     chest.Reward);
 
-                World.CompleteNodeAt(chest.X, chest.Y);
+                CompleteNode(chest.X, chest.Y);
                 Message += " Supplies recovered.";
             }
 
@@ -117,7 +117,7 @@ public class GameSession
                     terminalReward);
 
                 World.Player.Heal(terminal.HealAmount);
-                World.CompleteNodeAt(terminal.X, terminal.Y);
+                CompleteNode(terminal.X, terminal.Y);
                 Message += $" Restored {terminal.HealAmount} HP.";
             }
 
@@ -181,6 +181,7 @@ public class GameSession
             }
 
             World.BeginEnemyDeath(defeatedEnemy);
+            CompleteNode(defeatedEnemy.X, defeatedEnemy.Y);
             EndBattle();
 
             Message =
@@ -230,6 +231,7 @@ public class GameSession
         World.RebuildFloor(
             expedition.FloorSeed,
             expedition.CurrentFloor);
+        World.RestoreExpeditionState(expedition);
 
         ApplyPlayerState(expedition);
         ApplyGearBonuses();
@@ -329,6 +331,23 @@ public class GameSession
         RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
+    }
+
+    private void CompleteNode(int x, int y)
+    {
+        DungeonNode? node = World.GetNodeAt(x, y);
+        if (node == null)
+            return;
+
+        World.CompleteNodeAt(x, y);
+        if (!StateManager.ActiveExpedition.CompletedNodeIds.Contains(node.Id))
+            StateManager.ActiveExpedition.CompletedNodeIds.Add(node.Id);
+
+        if (node.Type == DungeonNodeType.Combat &&
+            !StateManager.ActiveExpedition.DefeatedNodeIds.Contains(node.Id))
+        {
+            StateManager.ActiveExpedition.DefeatedNodeIds.Add(node.Id);
+        }
     }
 
     private void RecordNodeVisit(int x, int y)
