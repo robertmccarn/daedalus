@@ -21,11 +21,14 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore
+      - name: Restore Game
         run: dotnet restore DOTNETCSHARP.csproj
+
+      - name: Restore Tests
+        run: dotnet restore tests/Daedalus.Tests/Daedalus.Tests.csproj
 
       - name: Build
         run: dotnet build DOTNETCSHARP.csproj --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test tests/Daedalus.Tests/Daedalus.Tests.csproj --configuration Release
+        run: dotnet test tests/Daedalus.Tests/Daedalus.Tests.csproj --configuration Release --no-restore
