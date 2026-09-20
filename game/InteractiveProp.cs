@@ -28,6 +28,8 @@ public class Chest : InteractiveProp
         Reward = reward ?? new RewardBundle();
     }
 
+    public void RestoreOpen() => IsOpen = true;
+
     public override string Interact()
     {
         if (IsOpen)
@@ -60,6 +62,8 @@ public class Terminal : InteractiveProp
 
         HealAmount = healAmount;
     }
+
+    public void RestoreActivated() => IsActivated = true;
 
     public override string Interact()
     {
