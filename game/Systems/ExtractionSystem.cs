@@ -13,21 +13,11 @@ public static class ExtractionSystem
             stateManager.Campaign,
             expedition);
 
-        foreach (EnergyCore core in expedition.Party
-                     .SelectMany(_ => Enumerable.Empty<EnergyCore>()))
-        {
-            stateManager.Campaign.Cores.Add(core);
-        }
-
-        stateManager.Campaign.Gold = Math.Max(
-            0,
-            stateManager.Campaign.Gold - expedition.Upkeep);
-
         stateManager.CompleteExpedition();
         return true;
     }
 
-    public static void ExtractReward(
+    public static void ApplyReward(
         CampaignState campaign,
         ExpeditionState expedition,
         RewardBundle reward)
@@ -50,17 +40,21 @@ public static class ExtractionSystem
             campaign.Gear.Add(gear);
 
         foreach (Material material in reward.Materials)
+        {
             InventorySystem.AddMaterial(
                 campaign,
                 material.Id,
                 material.Name,
                 material.Quantity);
+        }
 
         foreach (InventoryItem item in reward.Items)
+        {
             InventorySystem.AddItem(
                 expedition,
                 item.Id,
                 item.Name,
                 item.Quantity);
+        }
     }
 }
