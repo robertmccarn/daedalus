@@ -1,4 +1,5 @@
 using Systemic.Engine.State;
+using Xunit;
 
 public class Phase3HardeningTests
 {
@@ -10,11 +11,72 @@ public class Phase3HardeningTests
         manager.ActiveExpedition.Upkeep = 7;
         manager.ActiveExpedition.NodeHistory.Add("floor-1-chest");
 
-        manager.AdvanceFloor(20, 20, 25, 30);
+        manager.AdvanceFloor(25, 30);
+        manager.SetExpeditionPosition(20, 20);
 
         Assert.Equal(2, manager.ActiveExpedition.CurrentFloor);
         Assert.Equal(7, manager.ActiveExpedition.Upkeep);
         Assert.Contains("floor-1-chest", manager.ActiveExpedition.NodeHistory);
+        Assert.Empty(manager.ActiveExpedition.CompletedNodeIds);
+        Assert.Empty(manager.ActiveExpedition.DefeatedNodeIds);
+        Assert.Equal((20, 20), manager.ActiveExpedition.PlayerGridPosition);
+    }
+
+    [Fact]
+    public void Extraction_CommitsPartyProgressionButNotCurrentHealth()
+    {
+        GameStateManager manager = new();
+        manager.StartNewExpedition(10, 10, 30, 30);
+
+        PartyMember expeditionMember = manager.ActiveExpedition.Party
+            .Single(member => member.Id == "arden");
+        expeditionMember.Experience = 125;
+        expeditionMember.Level = 2;
+        expeditionMember.HP = 7;
+
+        PartyMember campaignMember = manager.Campaign.PartyRoster
+            .Single(member => member.Id == "arden");
+        campaignMember.HP = 30;
+
+        Assert.True(ExtractionSystem.Extract(manager));
+
+        Assert.Equal(125, campaignMember.Experience);
+        Assert.Equal(2, campaignMember.Level);
+        Assert.Equal(30, campaignMember.HP);
+    }
+
+    [Fact]
+    public void SaveRoundTrip_PreservesPartyProgression()
+    {
+        GameStateManager manager = new();
+        manager.StartNewExpedition(10, 10, 30, 30);
+        PartyMember expeditionMember = manager.ActiveExpedition.Party
+            .Single(member => member.Id == "arden");
+        expeditionMember.Experience = 75;
+        expeditionMember.Level = 2;
+
+        string path = Path.Combine(
+            Path.GetTempPath(),
+            $"daedalus-party-test-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            Assert.True(manager.Save(path));
+
+            GameStateManager loaded = new();
+            Assert.True(loaded.Load(path));
+
+            PartyMember loadedMember = loaded.ActiveExpedition.Party
+                .Single(member => member.Id == "arden");
+
+            Assert.Equal(75, loadedMember.Experience);
+            Assert.Equal(2, loadedMember.Level);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     [Fact]
