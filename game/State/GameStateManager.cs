@@ -54,6 +54,7 @@ public class GameStateManager
         ActiveExpedition.PlayerGridPosition = (startX, startY);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
+        ActiveExpedition.Upkeep = 0;
         ActiveExpedition.FloorSeed = Random.Shared.Next();
         ActiveExpedition.DiscoveredCells.Clear();
         MarkDiscovered(startX, startY);
@@ -107,8 +108,9 @@ public class GameStateManager
         return true;
     }
 
-    private static CampaignState CreateDefaultCampaign() =>
-        new()
+    private static CampaignState CreateDefaultCampaign()
+    {
+        CampaignState campaign = new()
         {
             PartyRoster = new()
             {
@@ -130,12 +132,38 @@ public class GameStateManager
             }
         };
 
+        campaign.Materials.Add(new Material
+        {
+            Id = "rusted-catalyst",
+            Name = "Rusted Catalyst",
+            Quantity = 2
+        });
+
+        campaign.Recipes.Add(new Recipe
+        {
+            Id = "reinforced-blade",
+            Name = "Reinforced Blade",
+            Ingredients = new() { "rusted-catalyst", "monster-residue" },
+            IngredientQuantities = new()
+            {
+                ["rusted-catalyst"] = 2,
+                ["monster-residue"] = 1
+            },
+            ResultKind = "Gear",
+            ResultSlot = "Weapon",
+            ResultPower = 5
+        });
+
+        return campaign;
+    }
+
     private static PartyMember ClonePartyMember(PartyMember source) =>
         new()
         {
             Id = source.Id,
             Name = source.Name,
             Level = source.Level,
+            Experience = source.Experience,
             HP = source.HP,
             MaxHP = source.MaxHP,
             Stats = new StatsData
@@ -144,6 +172,7 @@ public class GameStateManager
                 Magic = source.Stats.Magic,
                 Agility = source.Stats.Agility,
                 Luck = source.Stats.Luck
-            }
+            },
+            EquippedGearIds = new List<string>(source.EquippedGearIds)
         };
 }
