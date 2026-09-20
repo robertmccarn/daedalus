@@ -83,9 +83,10 @@ public class GameSession
 
         if (prop is Chest chest)
         {
+            bool wasOpen = chest.IsOpen;
             Message = chest.Interact();
 
-            if (chest.IsOpen)
+            if (!wasOpen && chest.IsOpen)
             {
                 ExtractionSystem.ApplyReward(
                     StateManager.Campaign,
