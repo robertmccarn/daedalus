@@ -29,7 +29,7 @@ public class GameStateManager
             Party = Campaign.PartyRoster.Select(ClonePartyMember).ToList()
         };
 
-        MarkDiscovered(startX, startY);
+        DiscoverArea(startX, startY);
     }
 
     public void StartNewExpedition()
@@ -42,19 +42,16 @@ public class GameStateManager
         ActiveExpedition.PlayerGridPosition = (x, y);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
-        MarkDiscovered(x, y);
+        DiscoverArea(x, y);
     }
 
     public void AdvanceFloor(int startX, int startY, int health, int maxHealth)
     {
         ActiveExpedition.CurrentFloor++;
-        ActiveExpedition.TurnCount = 0;
-        ActiveExpedition.NodeHistory.Clear();
-        ActiveExpedition.CurrentNode = "Start";
+        ActiveExpedition.CurrentNode = string.Empty;
         ActiveExpedition.PlayerGridPosition = (startX, startY);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
-        ActiveExpedition.Upkeep = 0;
         ActiveExpedition.FloorSeed = Random.Shared.Next();
         ActiveExpedition.DiscoveredCells.Clear();
         MarkDiscovered(startX, startY);
@@ -69,6 +66,13 @@ public class GameStateManager
         string key = $"{x},{y}";
         if (!ActiveExpedition.DiscoveredCells.Contains(key))
             ActiveExpedition.DiscoveredCells.Add(key);
+    }
+
+    public void DiscoverArea(int centerX, int centerY, int radius = 2)
+    {
+        for (int y = centerY - radius; y <= centerY + radius; y++)
+            for (int x = centerX - radius; x <= centerX + radius; x++)
+                MarkDiscovered(x, y);
     }
 
     public bool IsDiscovered(int x, int y) =>
