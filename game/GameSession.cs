@@ -109,14 +109,12 @@ public class GameSession
 
             if (!wasActivated && terminal.IsActivated)
             {
-                for (int i = 0; i < terminal.CoreReward.Quantity; i++)
-                {
-                    StateManager.Campaign.Cores.Add(new EnergyCore
-                    {
-                        Type = terminal.CoreReward.Type,
-                        Charge = terminal.CoreReward.Charge
-                    });
-                }
+                RewardBundle terminalReward = new();
+                terminalReward.Cores.Add(terminal.CoreReward);
+                ExtractionSystem.ApplyReward(
+                    StateManager.Campaign,
+                    StateManager.ActiveExpedition,
+                    terminalReward);
 
                 World.Player.Heal(terminal.HealAmount);
                 World.CompleteNodeAt(terminal.X, terminal.Y);
@@ -215,7 +213,7 @@ public class GameSession
     }
 
     public void DiscoverCell(int x, int y) =>
-        StateManager.MarkDiscovered(x, y);
+        StateManager.DiscoverArea(x, y);
 
     public bool IsCellDiscovered(int x, int y) =>
         StateManager.IsDiscovered(x, y);
@@ -244,6 +242,22 @@ public class GameSession
 
     public bool ExtractExpedition()
     {
+        if (State != GameState.Exploration ||
+            StateManager.ActiveExpedition.ExtractionState != "Active")
+            return false;
+
+        DungeonNode? node = World.GetNodeAt(
+            World.Player.X,
+            World.Player.Y);
+
+        if (node?.Type != DungeonNodeType.Extraction)
+        {
+            Message = "Extraction is only available at an extraction point.";
+            return false;
+        }
+
+        int upkeep = StateManager.ActiveExpedition.Upkeep;
+
         if (!ExtractionSystem.Extract(StateManager))
             return false;
 
@@ -251,7 +265,7 @@ public class GameSession
         Battle = null;
         Message =
             $"Expedition extracted at depth {StateManager.ActiveExpedition.CurrentFloor}. " +
-            $"Upkeep incurred: {StateManager.ActiveExpedition.Upkeep}.";
+            $"Upkeep settled: {upkeep}.";
 
         return true;
     }
@@ -273,6 +287,7 @@ public class GameSession
     {
         bool equipped = InventorySystem.EquipGear(
             StateManager.Campaign,
+            StateManager.ActiveExpedition,
             partyMemberId,
             gearId);
 
@@ -311,6 +326,7 @@ public class GameSession
             expedition.CurrentFloor);
 
         ApplyPlayerState(expedition);
+        RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
     }
