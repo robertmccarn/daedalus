@@ -29,7 +29,8 @@ public class GameRenderer : IDisposable
         GameState gameState,
         Character? battleEnemy,
         string message,
-        BattleCommand selectedCommand)
+        BattleCommand selectedCommand,
+        Func<int, int, bool> isCellDiscovered)
     {
         if (gameState ==
             GameState.Battle)
@@ -52,7 +53,8 @@ public class GameRenderer : IDisposable
 
         explorationRenderer.Draw(
             graphics,
-            world);
+            world,
+            isCellDiscovered);
     }
 
 
