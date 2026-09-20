@@ -9,7 +9,10 @@ public class TopDownWorldRenderer
     private const int VisibleRadiusX = 23;
     private const int VisibleRadiusY = 14;
 
-    public void Draw(Graphics graphics, GameWorld world)
+    public void Draw(
+        Graphics graphics,
+        GameWorld world,
+        Func<int, int, bool> isCellDiscovered)
     {
         graphics.Clear(Color.Black);
         graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
@@ -18,12 +21,17 @@ public class TopDownWorldRenderer
         int cameraX = world.Player.X * TileSize - ViewportCenterX;
         int cameraY = world.Player.Y * TileSize - ViewportCenterY;
 
-        DrawTiles(graphics, world, cameraX, cameraY);
-        DrawProps(graphics, world, cameraX, cameraY);
-        DrawCharacters(graphics, world, cameraX, cameraY);
+        DrawTiles(graphics, world, cameraX, cameraY, isCellDiscovered);
+        DrawProps(graphics, world, cameraX, cameraY, isCellDiscovered);
+        DrawCharacters(graphics, world, cameraX, cameraY, isCellDiscovered);
     }
 
-    private static void DrawTiles(Graphics graphics, GameWorld world, int cameraX, int cameraY)
+    private static void DrawTiles(
+        Graphics graphics,
+        GameWorld world,
+        int cameraX,
+        int cameraY,
+        Func<int, int, bool> isCellDiscovered)
     {
         int minX = Math.Max(0, world.Player.X - VisibleRadiusX);
         int maxX = Math.Min(world.Dungeon.GetLength(1) - 1, world.Player.X + VisibleRadiusX);
@@ -36,19 +44,33 @@ public class TopDownWorldRenderer
             {
                 int screenX = x * TileSize - cameraX;
                 int screenY = y * TileSize - cameraY;
+
+                if (!isCellDiscovered(x, y))
+                {
+                    using Brush fog = new SolidBrush(Color.Black);
+                    graphics.FillRectangle(fog, screenX, screenY, TileSize, TileSize);
+                    continue;
+                }
+
                 TileRenderer.Draw(graphics, world.Dungeon[y, x], screenX, screenY, TileSize);
             }
         }
     }
 
-    private static void DrawProps(Graphics graphics, GameWorld world, int cameraX, int cameraY)
+    private static void DrawProps(
+        Graphics graphics,
+        GameWorld world,
+        int cameraX,
+        int cameraY,
+        Func<int, int, bool> isCellDiscovered)
     {
         foreach (InteractiveProp prop in world.Props)
         {
             int screenX = prop.X * TileSize - cameraX;
             int screenY = prop.Y * TileSize - cameraY;
 
-            if (!IsVisible(screenX, screenY))
+            if (!IsVisible(screenX, screenY) ||
+                !isCellDiscovered(prop.X, prop.Y))
                 continue;
 
             Rectangle body = new(screenX + 4, screenY + 4, TileSize - 8, TileSize - 8);
@@ -61,23 +83,35 @@ public class TopDownWorldRenderer
         }
     }
 
-    private static void DrawCharacters(Graphics graphics, GameWorld world, int cameraX, int cameraY)
+    private static void DrawCharacters(
+        Graphics graphics,
+        GameWorld world,
+        int cameraX,
+        int cameraY,
+        Func<int, int, bool> isCellDiscovered)
     {
-        DrawCharacter(graphics, world.Player, cameraX, cameraY, Color.Cyan);
+        DrawCharacter(graphics, world.Player, cameraX, cameraY, Color.Cyan, isCellDiscovered);
 
         foreach (Character enemy in world.Enemies)
-            DrawCharacter(graphics, enemy, cameraX, cameraY, Color.IndianRed);
+            DrawCharacter(graphics, enemy, cameraX, cameraY, Color.IndianRed, isCellDiscovered);
 
         foreach (Character enemy in world.DefeatedEnemies)
-            DrawCharacter(graphics, enemy, cameraX, cameraY, Color.DarkRed);
+            DrawCharacter(graphics, enemy, cameraX, cameraY, Color.DarkRed, isCellDiscovered);
     }
 
-    private static void DrawCharacter(Graphics graphics, Character character, int cameraX, int cameraY, Color color)
+    private static void DrawCharacter(
+        Graphics graphics,
+        Character character,
+        int cameraX,
+        int cameraY,
+        Color color,
+        Func<int, int, bool> isCellDiscovered)
     {
         int screenX = character.X * TileSize - cameraX;
         int screenY = character.Y * TileSize - cameraY;
 
-        if (!IsVisible(screenX, screenY))
+        if (!IsVisible(screenX, screenY) ||
+            !isCellDiscovered(character.X, character.Y))
             return;
 
         Rectangle body = new(screenX + 5, screenY + 3, TileSize - 10, TileSize - 6);
