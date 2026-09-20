@@ -1,3 +1,5 @@
+using Systemic.Engine.State;
+
 public class GameWorld
 {
     public const int Width = 60;
@@ -9,6 +11,8 @@ public class GameWorld
     public List<Character> Enemies { get; private set; } = new();
     public List<Character> DefeatedEnemies { get; private set; } = new();
     public List<InteractiveProp> Props { get; private set; } = new();
+    public List<StaticUnit> StaticUnits { get; private set; } = new();
+    public List<DungeonNode> Nodes { get; private set; } = new();
 
     public int Floor { get; private set; } = 1;
     public int FloorSeed { get; private set; }
@@ -50,9 +54,12 @@ public class GameWorld
         Enemies = new List<Character>();
         DefeatedEnemies = new List<Character>();
         Props = new List<InteractiveProp>();
+        StaticUnits = new List<StaticUnit>();
+        Nodes = new List<DungeonNode>();
 
         CreateEnemies();
         CreateProps();
+        CreateNodes();
     }
 
     public bool IsWalkable(int x, int y)
@@ -76,6 +83,19 @@ public class GameWorld
     public InteractiveProp? GetPropAt(int x, int y) =>
         Props.FirstOrDefault(prop => prop.X == x && prop.Y == y);
 
+    public StaticUnit? GetStaticUnitAt(int x, int y) =>
+        StaticUnits.FirstOrDefault(unit => unit.X == x && unit.Y == y);
+
+    public DungeonNode? GetNodeAt(int x, int y) =>
+        Nodes.FirstOrDefault(node => node.X == x && node.Y == y);
+
+    public void CompleteNodeAt(int x, int y)
+    {
+        DungeonNode? node = GetNodeAt(x, y);
+        if (node != null)
+            node.IsCompleted = true;
+    }
+
     public void RemoveEnemy(Character enemy) =>
         Enemies.Remove(enemy);
 
@@ -83,6 +103,7 @@ public class GameWorld
     {
         Enemies.Remove(enemy);
         DefeatedEnemies.Add(enemy);
+        CompleteNodeAt(enemy.X, enemy.Y);
     }
 
     private void CreateEnemies()
@@ -104,7 +125,107 @@ public class GameWorld
 
     private void CreateProps()
     {
-        Props.Add(new Chest(SpawnX + 1, SpawnY));
-        Props.Add(new Terminal(SpawnX + 2, SpawnY));
+        RewardBundle chestReward = new()
+        {
+            Gold = 5 * Floor
+        };
+
+        chestReward.Items.Add(new InventoryItem
+        {
+            Id = "healing-tonic",
+            Name = "Healing Tonic",
+            Quantity = 1
+        });
+
+        chestReward.Materials.Add(new Material
+        {
+            Id = "rusted-catalyst",
+            Name = "Rusted Catalyst",
+            Quantity = 2
+        });
+
+        Props.Add(new Chest(SpawnX + 1, SpawnY, chestReward));
+
+        Props.Add(new Terminal(
+            SpawnX + 2,
+            SpawnY,
+            new CoreReward
+            {
+                Type = Floor >= 3 ? "Refined" : "Standard",
+                Charge = 8 + Floor,
+                Quantity = 1
+            },
+            healAmount: 8));
+    }
+
+    private void CreateNodes()
+    {
+        Nodes.Add(new DungeonNode
+        {
+            Id = $"floor-{Floor}-start",
+            Name = "Expedition Start",
+            Type = DungeonNodeType.Start,
+            X = SpawnX,
+            Y = SpawnY,
+            IsCompleted = true
+        });
+
+        InteractiveProp? chest = GetPropAt(SpawnX + 1, SpawnY);
+        if (chest != null)
+        {
+            Nodes.Add(new DungeonNode
+            {
+                Id = $"floor-{Floor}-chest",
+                Name = "Supply Cache",
+                Type = DungeonNodeType.Chest,
+                X = chest.X,
+                Y = chest.Y
+            });
+
+            StaticUnits.Add(new StaticUnit(
+                "Supply Cache",
+                chest.X,
+                chest.Y,
+                false,
+                DungeonNodeType.Chest));
+        }
+
+        InteractiveProp? terminal = GetPropAt(SpawnX + 2, SpawnY);
+        if (terminal != null)
+        {
+            Nodes.Add(new DungeonNode
+            {
+                Id = $"floor-{Floor}-terminal",
+                Name = "Energy Terminal",
+                Type = DungeonNodeType.Terminal,
+                X = terminal.X,
+                Y = terminal.Y
+            });
+
+            StaticUnits.Add(new StaticUnit(
+                "Energy Terminal",
+                terminal.X,
+                terminal.Y,
+                false,
+                DungeonNodeType.Terminal));
+        }
+
+        Nodes.Add(new DungeonNode
+        {
+            Id = $"floor-{Floor}-combat",
+            Name = "Hostile Contact",
+            Type = DungeonNodeType.Combat,
+            X = ExitX - 2,
+            Y = ExitY
+        });
+
+        Nodes.Add(new DungeonNode
+        {
+            Id = $"floor-{Floor}-extraction",
+            Name = "Descent",
+            Type = DungeonNodeType.Extraction,
+            X = ExitX,
+            Y = ExitY
+        });
     }
 }
