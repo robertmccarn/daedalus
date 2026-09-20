@@ -36,16 +36,7 @@ public class TopDownWorldRenderer
             {
                 int screenX = x * TileSize - cameraX;
                 int screenY = y * TileSize - cameraY;
-                Tile tile = world.Dungeon[y, x];
-
-                using Brush brush = new SolidBrush(GetTileColor(tile.Type));
-                graphics.FillRectangle(brush, screenX, screenY, TileSize, TileSize);
-
-                if (tile.Type == TileType.Wall)
-                {
-                    using Pen pen = new(Color.FromArgb(35, 35, 45), 1);
-                    graphics.DrawRectangle(pen, screenX, screenY, TileSize - 1, TileSize - 1);
-                }
+                TileRenderer.Draw(graphics, world.Dungeon[y, x], screenX, screenY, TileSize);
             }
         }
     }
@@ -60,11 +51,7 @@ public class TopDownWorldRenderer
             if (!IsVisible(screenX, screenY))
                 continue;
 
-            Rectangle body = new(
-                screenX + 4,
-                screenY + 4,
-                TileSize - 8,
-                TileSize - 8);
+            Rectangle body = new(screenX + 4, screenY + 4, TileSize - 8, TileSize - 8);
 
             using Brush brush = new SolidBrush(GetPropColor(prop));
             graphics.FillRectangle(brush, body);
@@ -85,12 +72,7 @@ public class TopDownWorldRenderer
             DrawCharacter(graphics, enemy, cameraX, cameraY, Color.DarkRed);
     }
 
-    private static void DrawCharacter(
-        Graphics graphics,
-        Character character,
-        int cameraX,
-        int cameraY,
-        Color color)
+    private static void DrawCharacter(Graphics graphics, Character character, int cameraX, int cameraY, Color color)
     {
         int screenX = character.X * TileSize - cameraX;
         int screenY = character.Y * TileSize - cameraY;
@@ -98,11 +80,7 @@ public class TopDownWorldRenderer
         if (!IsVisible(screenX, screenY))
             return;
 
-        Rectangle body = new(
-            screenX + 5,
-            screenY + 3,
-            TileSize - 10,
-            TileSize - 6);
+        Rectangle body = new(screenX + 5, screenY + 3, TileSize - 10, TileSize - 6);
 
         using Brush brush = new SolidBrush(color);
         graphics.FillRectangle(brush, body);
@@ -110,20 +88,6 @@ public class TopDownWorldRenderer
         using Pen outline = new(Color.Black, 2);
         graphics.DrawRectangle(outline, body);
     }
-
-    private static Color GetTileColor(TileType type) => type switch
-    {
-        TileType.Wall => Color.FromArgb(48, 45, 58),
-        TileType.Floor => Color.FromArgb(82, 78, 91),
-        TileType.Door => Color.FromArgb(125, 91, 54),
-        TileType.StairsUp => Color.FromArgb(100, 110, 125),
-        TileType.StairsDown => Color.FromArgb(55, 50, 70),
-        TileType.Treasure => Color.FromArgb(105, 82, 38),
-        TileType.Trap => Color.FromArgb(70, 45, 65),
-        TileType.Water => Color.FromArgb(35, 70, 95),
-        TileType.Pillar => Color.FromArgb(65, 61, 72),
-        _ => Color.Black
-    };
 
     private static Color GetPropColor(InteractiveProp prop) => prop switch
     {

@@ -165,8 +165,8 @@ Write-Host "Checking required directories..." -ForegroundColor Cyan
 $requiredDirectories = @(
     "game",
     "ui",
-    "assets",
-    "assets\tiles"
+    ".github",
+    ".github\workflows"
 )
 
 
@@ -245,7 +245,9 @@ $requiredFiles = @(
     "ui\BattleRenderer.cs",
     "ui\StatsWindow.cs",
 
-    "assets\tiles\dungeon.png"
+    "daedalus.meta",
+
+    ".github\workflows\build.yml"
 )
 
 
@@ -319,7 +321,8 @@ $filesToBackup = @(
     "ui\BattleRenderer.cs",
     "ui\StatsWindow.cs",
 
-    "DOTNETCSHARP.csproj"
+    "DOTNETCSHARP.csproj",
+    "daedalus.meta"
 )
 
 
@@ -428,6 +431,45 @@ if ($battleSystemErrors.Count -gt 0) {
 
 
 Write-Host "  BattleSystem structure OK." -ForegroundColor Green
+
+
+# ------------------------------------------------------------
+# 9. Validate TileRenderer
+# ------------------------------------------------------------
+
+Write-Host ""
+Write-Host "Validating TileRenderer..." -ForegroundColor Cyan
+
+$tileRendererPath = Join-Path $projectRoot "game\TileRenderer.cs"
+$tileRendererContent = Get-Content $tileRendererPath -Raw
+
+$tileRendererRequirements = @(
+    "class TileRenderer",
+    "static void Draw",
+    "GetTileColor",
+    "TileType.Wall"
+)
+
+$tileRendererErrors = @()
+
+foreach ($requirement in $tileRendererRequirements) {
+    if ($tileRendererContent -notmatch [regex]::Escape($requirement)) {
+        $tileRendererErrors += $requirement
+    }
+}
+
+if ($tileRendererErrors.Count -gt 0) {
+    Write-Host ""
+    Write-Host "ERROR: TileRenderer validation failed." -ForegroundColor Red
+
+    foreach ($requirement in $tileRendererErrors) {
+        Write-Host "  Missing: $requirement" -ForegroundColor Red
+    }
+
+    exit 1
+}
+
+Write-Host "  TileRenderer structure OK." -ForegroundColor Green
 
 
 # ------------------------------------------------------------
