@@ -7,6 +7,10 @@ public class ExpeditionState
     public int Health { get; set; } = 30;
     public int MaxHealth { get; set; } = 30;
     public List<InventoryItem> CarriedInventory { get; set; } = new();
+    public List<EnergyCore> CarriedCores { get; set; } = new();
+    public List<Gear> CarriedGear { get; set; } = new();
+    public List<Material> CarriedMaterials { get; set; } = new();
+    public int CarriedGold { get; set; }
     public List<string> DiscoveredCells { get; set; } = new();
     public int Upkeep { get; set; }
     public List<string> NodeHistory { get; set; } = new();
