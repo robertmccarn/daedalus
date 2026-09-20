@@ -250,7 +250,7 @@ public class GameSession
         Battle = null;
         Message =
             $"Expedition extracted at depth {StateManager.ActiveExpedition.CurrentFloor}. " +
-            $"Upkeep paid: {StateManager.ActiveExpedition.Upkeep}.";
+            $"Upkeep incurred: {StateManager.ActiveExpedition.Upkeep}.";
 
         return true;
     }
@@ -266,6 +266,19 @@ public class GameSession
         return SynthesisSystem.SynthesizeGear(
             StateManager.Campaign,
             recipe);
+    }
+
+    public bool EquipGear(string gearId, string partyMemberId = "arden")
+    {
+        bool equipped = InventorySystem.EquipGear(
+            StateManager.Campaign,
+            partyMemberId,
+            gearId);
+
+        if (equipped)
+            ApplyGearBonuses();
+
+        return equipped;
     }
 
     private void StartBattle(Character enemy)
