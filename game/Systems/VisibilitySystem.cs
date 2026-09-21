@@ -8,6 +8,12 @@ public static class VisibilitySystem
         GridPosition target,
         int radius = 7)
     {
+        if (origin.X < 0 || origin.X >= GameWorld.Width ||
+            origin.Y < 0 || origin.Y >= GameWorld.Height ||
+            target.X < 0 || target.X >= GameWorld.Width ||
+            target.Y < 0 || target.Y >= GameWorld.Height)
+            return false;
+
         int dx = target.X - origin.X;
         int dy = target.Y - origin.Y;
 
