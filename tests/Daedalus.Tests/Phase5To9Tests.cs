@@ -200,7 +200,6 @@ public class Phase5To9Tests
 
         BattleSystem battle = new(expedition, new[] { enemy });
         battle.SelectNextCommand();
-        battle.SelectNextCommand();
 
         Assert.Equal(BattleCommand.Skill, battle.SelectedCommand);
 
