@@ -6,6 +6,7 @@ public sealed class RuinFeatureRenderer
     public void Draw(Graphics g, ExplorationRenderContext context)
     {
         WorldPresentationProfile p = context.Profile;
+        long now = AnimationClock.Now;
         SmoothingMode originalSmoothing = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -24,7 +25,7 @@ public sealed class RuinFeatureRenderer
             switch (feature.Type)
             {
                 case WorldVisualFeatureType.Abyss:
-                    DrawAbyss(g, context, feature, p);
+                    DrawAbyss(g, context, feature, p, now);
                     break;
                 case WorldVisualFeatureType.Bridge:
                     DrawBridge(g, context, feature, p);
@@ -42,7 +43,7 @@ public sealed class RuinFeatureRenderer
                     DrawDoorway(g, context, feature, p);
                     break;
                 case WorldVisualFeatureType.Landmark:
-                    DrawLandmark(g, context, feature, p);
+                    DrawLandmark(g, context, feature, p, now);
                     break;
             }
         }
@@ -54,7 +55,8 @@ public sealed class RuinFeatureRenderer
         Graphics g,
         ExplorationRenderContext context,
         WorldVisualFeature feature,
-        WorldPresentationProfile p)
+        WorldPresentationProfile p,
+        long now)
     {
         Point origin = context.ToScreen(new GridPosition(feature.X, feature.Y));
         int width = feature.Width * context.TileSize;
@@ -81,14 +83,20 @@ public sealed class RuinFeatureRenderer
         using Brush voidFill = new SolidBrush(Color.FromArgb(248, p.Void.R, p.Void.G, p.Void.B));
         g.FillPolygon(voidFill, rim);
 
-        using Brush depthGlow = new SolidBrush(Color.FromArgb(30, p.Accent.R, p.Accent.G, p.Accent.B));
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 2100, feature.Variant * 71);
+        using Brush depthGlow = new SolidBrush(Color.FromArgb(
+            24 + (int)(18 * pulse),
+            p.Accent.R,
+            p.Accent.G,
+            p.Accent.B));
         g.FillEllipse(depthGlow, origin.X + width / 6, origin.Y + height / 4, width * 2 / 3, height / 2);
 
-        // Distant vertical silhouettes make the opening read as a deep architectural space.
+        // Distant vertical silhouettes drift at different speeds, creating a layered abyss.
         for (int i = 0; i < 5; i++)
         {
             int sx = origin.X + 10 + i * Math.Max(18, width / 5);
-            int top = origin.Y + 16 + PositiveMod(feature.Variant * 11 + i * 17, Math.Max(18, height / 2));
+            int drift = (int)MathF.Round(AnimationClock.Sine(now, 3200 + i * 240, feature.Variant * 37 + i * 19) * 7f);
+            int top = origin.Y + 16 + PositiveMod(feature.Variant * 11 + i * 17, Math.Max(18, height / 2)) + drift;
             int columnWidth = 7 + (i % 2) * 4;
             int columnHeight = Math.Max(18, height - (top - origin.Y) - 6);
 
@@ -302,8 +310,14 @@ public sealed class RuinFeatureRenderer
         Point s = context.ToScreen(new GridPosition(feature.X, feature.Y));
         int lift = feature.Elevation * 4;
         int height = 40 + feature.Height * 6 + feature.Elevation * 2;
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 1400, feature.X * 41 + feature.Y * 17);
+        int bob = (int)MathF.Round(AnimationClock.Sine(now, 1900, feature.X * 13 + feature.Y * 7) * 1.5f);
 
-        using Brush glow = new SolidBrush(Color.FromArgb(32, p.Accent.R, p.Accent.G, p.Accent.B));
+        using Brush glow = new SolidBrush(Color.FromArgb(
+            24 + (int)(30 * pulse),
+            p.Accent.R,
+            p.Accent.G,
+            p.Accent.B));
         g.FillEllipse(glow, s.X - 30, s.Y - height + 8 - lift, 76, 76);
 
         using Brush shadow = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
@@ -311,21 +325,32 @@ public sealed class RuinFeatureRenderer
 
         Point[] monolith =
         {
-            new(s.X + 9, s.Y + 14 - height - lift),
-            new(s.X + 20, s.Y + 7 - height - lift),
-            new(s.X + 27, s.Y + 16 - height - lift),
-            new(s.X + 23, s.Y + 37 - lift),
-            new(s.X + 9, s.Y + 34 - lift)
+            new(s.X + 9, s.Y + 14 - height - lift + bob),
+            new(s.X + 20, s.Y + 7 - height - lift + bob),
+            new(s.X + 27, s.Y + 16 - height - lift + bob),
+            new(s.X + 23, s.Y + 37 - lift + bob),
+            new(s.X + 9, s.Y + 34 - lift + bob)
         };
 
         using Brush body = new SolidBrush(Color.FromArgb(84, 85, 82));
         g.FillPolygon(body, monolith);
 
-        using Pen accent = new(Color.FromArgb(220, p.Accent.R, p.Accent.G, p.Accent.B), 2);
-        g.DrawLine(accent, s.X + 18, s.Y + 12 - height - lift, s.X + 18, s.Y + 31 - lift);
+        int accentAlpha = 180 + (int)(60 * pulse);
+        using Pen accent = new(Color.FromArgb(accentAlpha, p.Accent.R, p.Accent.G, p.Accent.B), 2);
+        g.DrawLine(accent, s.X + 18, s.Y + 12 - height - lift + bob, s.X + 18, s.Y + 31 - lift + bob);
 
-        using Brush core = new SolidBrush(Color.FromArgb(220, p.Accent.R, p.Accent.G, p.Accent.B));
-        g.FillEllipse(core, s.X + 14, s.Y + 19 - height / 2 - lift, 8, 8);
+        int coreSize = 7 + (int)(3 * pulse);
+        using Brush core = new SolidBrush(Color.FromArgb(
+            accentAlpha,
+            p.Accent.R,
+            p.Accent.G,
+            p.Accent.B));
+        g.FillEllipse(
+            core,
+            s.X + 18 - coreSize / 2,
+            s.Y + 23 - height / 2 - lift + bob,
+            coreSize,
+            coreSize);
     }
     private static int PositiveMod(int value, int divisor) =>
         ((value % divisor) + divisor) % divisor;
