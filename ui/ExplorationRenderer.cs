@@ -20,9 +20,17 @@ public class ExplorationRenderer : IDisposable
         GameWorld world,
         PartyController party,
         ExpeditionState expedition,
-        Func<int, int, bool> isCellDiscovered)
+        Func<int, int, bool> isCellDiscovered,
+        string currentObjective,
+        string message)
     {
-        ExplorationRenderContext context = new(world, party, expedition, isCellDiscovered);
+        ExplorationRenderContext context = new(
+            world,
+            party,
+            expedition,
+            isCellDiscovered,
+            currentObjective,
+            message);
 
         backdropRenderer.Draw(graphics, context);
         worldRenderer.Draw(graphics, context);
