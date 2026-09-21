@@ -135,17 +135,23 @@ public class GameWindow : Form
             return true;
         }
 
+        // Target selection: A = previous (<), D = next (>).
+        if (key == Keys.A)
+        {
+            session.SelectPreviousBattleTarget();
+            return true;
+        }
+
+        if (key == Keys.D)
+        {
+            session.SelectNextBattleTarget();
+            return true;
+        }
+
         // Confirm: E, Enter, or Space.
         if (key is Keys.E or Keys.Enter or Keys.Space)
         {
             session.PerformBattleCommand();
-            return true;
-        }
-
-        // Target cycling: D/Left/Right.
-        if (key is Keys.D or Keys.Left or Keys.Right)
-        {
-            session.SelectNextBattleTarget();
             return true;
         }
 
