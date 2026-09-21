@@ -235,38 +235,49 @@ public sealed class RuinFeatureRenderer
     {
         Point s = context.ToScreen(new GridPosition(feature.X, feature.Y));
         int lift = feature.Elevation * 4;
-        int height = 30 + feature.Elevation * 5;
+        int height = 36 + feature.Height * 7 + feature.Elevation * 5;
+        int width = Math.Max(24, Math.Min(42, feature.Width * context.TileSize));
 
-        using Brush shadow = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
-        g.FillEllipse(shadow, s.X + 2, s.Y + context.TileSize - 7, 27, 9);
+        using Brush shadow = new SolidBrush(Color.FromArgb(110, 0, 0, 0));
+        g.FillEllipse(shadow, s.X + 1, s.Y + context.TileSize - 6, width, 10);
 
+        int center = s.X + width / 2;
         Point[] body =
         {
-            new(s.X + 7, s.Y + 8 - height / 3 - lift),
-            new(s.X + 22, s.Y + 4 - height / 3 - lift),
-            new(s.X + 23, s.Y + 22 - lift),
-            new(s.X + 6, s.Y + 25 - lift)
+            new(s.X + 7, s.Y + 17 - height - lift),
+            new(center - 5, s.Y + 7 - height - lift),
+            new(s.X + width - 6, s.Y + 13 - height - lift),
+            new(s.X + width - 4, s.Y + 25 - lift),
+            new(center + 5, s.Y + 31 - lift),
+            new(s.X + 7, s.Y + 27 - lift)
         };
-        using Brush stone = new SolidBrush(Color.FromArgb(88, 84, 77));
+
+        using Brush stone = new SolidBrush(Color.FromArgb(86, 82, 75));
         g.FillPolygon(stone, body);
 
         Point[] sidePlane =
         {
-            new(s.X + 18, s.Y + 6 - height / 3 - lift),
-            new(s.X + 23, s.Y + 4 - height / 3 - lift),
-            new(s.X + 23, s.Y + 22 - lift),
-            new(s.X + 18, s.Y + 23 - lift)
+            new(center + 2, s.Y + 9 - height - lift),
+            new(s.X + width - 6, s.Y + 13 - height - lift),
+            new(s.X + width - 4, s.Y + 25 - lift),
+            new(center + 5, s.Y + 31 - lift)
         };
-        using Brush side = new SolidBrush(Color.FromArgb(68, 64, 59));
+        using Brush side = new SolidBrush(Color.FromArgb(58, 55, 52));
         g.FillPolygon(side, sidePlane);
 
-        using Pen highlight = new(Color.FromArgb(145, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
+        using Pen highlight = new(
+            Color.FromArgb(155, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B),
+            1);
         g.DrawLine(
             highlight,
-            s.X + 7,
-            s.Y + 8 - height / 3 - lift,
-            s.X + 22,
-            s.Y + 4 - height / 3 - lift);
+            s.X + 8,
+            s.Y + 16 - height - lift,
+            center - 5,
+            s.Y + 7 - height - lift);
+
+        using Pen crack = new(Color.FromArgb(75, p.Void.R, p.Void.G, p.Void.B), 1);
+        g.DrawLine(crack, center - 2, s.Y + 17 - height - lift, center - 6, s.Y + 29 - lift);
+        g.DrawLine(crack, center - 6, s.Y + 29 - lift, center + 1, s.Y + 33 - lift);
     }
 
     private static void DrawRubble(
