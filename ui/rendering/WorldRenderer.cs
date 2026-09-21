@@ -12,9 +12,9 @@ public sealed class WorldRenderer
         int radiusY = 12;
 
         int minX = Math.Max(0, leader.X - radiusX);
-        int maxX = Math.Min(world.Width - 1, leader.X + radiusX);
+        int maxX = Math.Min(GameWorld.Width - 1, leader.X + radiusX);
         int minY = Math.Max(0, leader.Y - radiusY);
-        int maxY = Math.Min(world.Height - 1, leader.Y + radiusY);
+        int maxY = Math.Min(GameWorld.Height - 1, leader.Y + radiusY);
 
         for (int y = minY; y <= maxY; y++)
         {
