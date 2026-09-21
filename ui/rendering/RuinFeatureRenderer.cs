@@ -305,7 +305,8 @@ public sealed class RuinFeatureRenderer
         Graphics g,
         ExplorationRenderContext context,
         WorldVisualFeature feature,
-        WorldPresentationProfile p)
+        WorldPresentationProfile p,
+        long now)
     {
         Point s = context.ToScreen(new GridPosition(feature.X, feature.Y));
         int lift = feature.Elevation * 4;
