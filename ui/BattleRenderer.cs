@@ -118,7 +118,10 @@ public class BattleRenderer : IDisposable
             g.DrawString(enemy.Name, smallFont, Brushes.White, x - 12, y + 54);
             g.DrawString($"HP {enemy.HP}/{enemy.MAXHP}", microFont, Brushes.Gainsboro, x - 12, y + 68);
             if (enemy.HP > 0 && battle.HasStatus(enemy, "Poisoned"))
-                g.DrawString("POISON", microFont, new SolidBrush(p.Hazard), x - 12, y + 81);
+            {
+                using Brush poisonBrush = new SolidBrush(p.Hazard);
+                g.DrawString("POISON", microFont, poisonBrush, x - 12, y + 81);
+            }
             index++;
         }
     }
