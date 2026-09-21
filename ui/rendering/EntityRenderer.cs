@@ -10,6 +10,7 @@ public sealed class EntityRenderer
                      .ThenBy(x => x.PartySlot))
         {
             if (!context.IsDiscovered(member.Position.X, member.Position.Y) ||
+                !context.IsVisible(member.Position.X, member.Position.Y) ||
                 !context.Visible(member.Position))
                 continue;
 
@@ -19,7 +20,7 @@ public sealed class EntityRenderer
         foreach (Character enemy in context.World.Enemies.OrderBy(x => x.Y).ThenBy(x => x.X))
         {
             GridPosition pos = new(enemy.X, enemy.Y);
-            if (!context.IsDiscovered(enemy.X, enemy.Y) || !context.Visible(pos))
+            if (!context.IsDiscovered(enemy.X, enemy.Y) || !context.IsVisible(enemy.X, enemy.Y) || !context.Visible(pos))
                 continue;
 
             DrawEnemy(g, context, enemy);
