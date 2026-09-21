@@ -37,6 +37,24 @@ public class GameWindow : Form
     {
         Keys key = keyData & Keys.KeyCode;
 
+        if (key == Keys.F1)
+        {
+            session.ToggleDevMenu();
+            Invalidate();
+            return true;
+        }
+
+        if (session.DevMenuOpen)
+        {
+            if (HandleDevMenuInput(key))
+            {
+                Invalidate();
+                return true;
+            }
+
+            return true;
+        }
+
         switch (session.State)
         {
             case GameState.Battle:
@@ -76,6 +94,47 @@ public class GameWindow : Form
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private bool HandleDevMenuInput(Keys key)
+    {
+        if (key == Keys.Escape)
+        {
+            session.CloseDevMenu();
+            return true;
+        }
+
+        if (key is Keys.W or Keys.Up)
+        {
+            session.AdjustDevFloor(-1);
+            return true;
+        }
+
+        if (key is Keys.S or Keys.Down)
+        {
+            session.AdjustDevFloor(1);
+            return true;
+        }
+
+        if (key is Keys.A or Keys.Left)
+        {
+            session.AdjustDevFloor(-5);
+            return true;
+        }
+
+        if (key is Keys.D or Keys.Right)
+        {
+            session.AdjustDevFloor(5);
+            return true;
+        }
+
+        if (key is Keys.E or Keys.Enter or Keys.Space)
+        {
+            session.JumpToDevFloor();
+            return true;
+        }
+
+        return false;
     }
 
     private bool HandleExplorationInput(Keys key)
