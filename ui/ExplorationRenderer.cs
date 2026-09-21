@@ -3,7 +3,12 @@ using Systemic.Engine.State;
 
 public class ExplorationRenderer : IDisposable
 {
-    private readonly TopDownWorldRenderer worldRenderer = new();
+    private readonly BackdropRenderer backdropRenderer = new();
+    private readonly WorldRenderer worldRenderer = new();
+    private readonly StructureRenderer structureRenderer = new();
+    private readonly EntityRenderer entityRenderer = new();
+    private readonly ForegroundRenderer foregroundRenderer = new();
+    private readonly EffectRenderer effectRenderer = new();
     private readonly ExplorationHudRenderer hudRenderer = new();
 
     public ExplorationRenderer(GameWorld world)
@@ -17,12 +22,16 @@ public class ExplorationRenderer : IDisposable
         ExpeditionState expedition,
         Func<int, int, bool> isCellDiscovered)
     {
-        worldRenderer.Draw(graphics, world, party, expedition, isCellDiscovered);
-        hudRenderer.Draw(graphics, party, expedition);
+        ExplorationRenderContext context = new(world, party, expedition, isCellDiscovered);
+
+        backdropRenderer.Draw(graphics, context);
+        worldRenderer.Draw(graphics, context);
+        structureRenderer.Draw(graphics, context);
+        entityRenderer.Draw(graphics, context);
+        effectRenderer.Draw(graphics, context);
+        foregroundRenderer.Draw(graphics, context);
+        hudRenderer.Draw(graphics, context);
     }
 
-    public void Dispose()
-    {
-        hudRenderer.Dispose();
-    }
+    public void Dispose() => hudRenderer.Dispose();
 }
