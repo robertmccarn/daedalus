@@ -136,7 +136,7 @@ public sealed class RuinFeatureRenderer
         g.FillPolygon(bridge, deck);
 
         using Brush wornTop = new SolidBrush(Color.FromArgb(148, 127, 98));
-        g.FillPolygon(wornTop, new[]
+        g.FillPolygon(wornTop, new Point[]
         {
             new(origin.X + 3, origin.Y + 8 - lift),
             new(origin.X + width - 7, origin.Y + 4 - lift),
@@ -327,4 +327,7 @@ public sealed class RuinFeatureRenderer
         using Brush core = new SolidBrush(Color.FromArgb(220, p.Accent.R, p.Accent.G, p.Accent.B));
         g.FillEllipse(core, s.X + 14, s.Y + 19 - height / 2 - lift, 8, 8);
     }
+    private static int PositiveMod(int value, int divisor) =>
+        ((value % divisor) + divisor) % divisor;
+
 }

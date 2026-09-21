@@ -97,11 +97,13 @@ public sealed class StructureRenderer
                 break;
 
             default:
+            {
                 using Brush body = new SolidBrush(p.WallHighlight);
                 g.FillRectangle(body, s.X + 7, s.Y + 8 - lift, 14, 12);
                 using Pen outline = new(p.Void, 2);
                 g.DrawRectangle(outline, s.X + 7, s.Y + 8 - lift, 14, 12);
                 break;
+            }
         }
     }
 
