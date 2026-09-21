@@ -146,5 +146,23 @@ public class Phase5To9Tests
         Assert.Contains(first.VisualFeatures, feature => feature.Type == WorldVisualFeatureType.Landmark);
 
         Assert.True(first.IsWalkable(first.SpawnX, first.SpawnY + 3));
+        Assert.True(first.IsWalkable(first.SpawnX - 5, first.SpawnY - 4));
+    }
+
+    [Fact]
+    public void NewExpedition_RevealsStartingChamberButNotTheWholeFloor()
+    {
+        GameStateManager manager = new();
+        manager.StartNewExpedition(
+            20,
+            10,
+            30,
+            30,
+            floor: 1,
+            floorSeed: 12345);
+
+        Assert.True(manager.IsDiscovered(20, 10));
+        Assert.True(manager.IsDiscovered(15, 5));
+        Assert.False(manager.IsDiscovered(10, 0));
     }
 }
