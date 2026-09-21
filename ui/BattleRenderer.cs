@@ -302,16 +302,11 @@ public class BattleRenderer : IDisposable
         g.DrawString(enemy.Name, smallFont, nameBrush, x - 12, y + 54);
         g.DrawString($"HP {enemy.HP}/{enemy.MAXHP}", microFont, hpBrush, x - 12, y + 68);
 
-        if (enemy.HP > 0 && battleHasPoisoned(enemy, g))
+        if (enemy.HP > 0 && battle.HasStatus(enemy, "Poisoned"))
         {
-            // Status is rendered by the main battle state elsewhere; this branch is intentionally minimal.
+            using Brush poison = new SolidBrush(WithAlpha(Color.FromArgb(92, 174, 130), alpha));
+            g.DrawString("POISON", microFont, poison, x - 12, y + 81);
         }
-    }
-
-    private static bool battleHasPoisoned(Character enemy, Graphics g)
-    {
-        _ = g;
-        return false;
     }
 
     private static AnimationPose GetPose(
