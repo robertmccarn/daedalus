@@ -7,14 +7,23 @@ public class GameOverRenderer : IDisposable
 
     public void Draw(Graphics graphics, string message)
     {
+        long now = AnimationClock.Now;
         graphics.Clear(Color.Black);
         const int frameX = 180;
         const int frameY = 180;
         const int frameWidth = 740;
         const int frameHeight = 280;
 
-        graphics.DrawRectangle(Pens.White, frameX, frameY, frameWidth, frameHeight);
-        graphics.DrawString("GAME OVER", titleFont, Brushes.Red, 390, 235);
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 1200);
+        using Pen frame = new(Color.FromArgb(150 + (int)(80 * pulse), 160, 45, 45), 2);
+        graphics.DrawRectangle(frame, frameX, frameY, frameWidth, frameHeight);
+
+        using Brush gameOver = new SolidBrush(Color.FromArgb(
+            185 + (int)(70 * pulse),
+            220,
+            65,
+            65));
+        graphics.DrawString("GAME OVER", titleFont, gameOver, 390, 235);
 
         string displayMessage = string.IsNullOrWhiteSpace(message)
             ? "Your expedition has ended."
