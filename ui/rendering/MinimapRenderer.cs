@@ -11,12 +11,12 @@ public sealed class MinimapRenderer
         g.DrawRectangle(border, bounds);
 
         int cell = Math.Max(2, Math.Min(bounds.Width / GameWorld.Width, bounds.Height / GameWorld.Height));
-        int ox = bounds.X + (bounds.Width - cell * context.World.Width) / 2;
-        int oy = bounds.Y + (bounds.Height - cell * context.World.Height) / 2;
+        int ox = bounds.X + (bounds.Width - cell * GameWorld.Width) / 2;
+        int oy = bounds.Y + (bounds.Height - cell * GameWorld.Height) / 2;
 
-        for (int y = 0; y < context.World.Height; y++)
+        for (int y = 0; y < GameWorld.Height; y++)
         {
-            for (int x = 0; x < context.World.Width; x++)
+            for (int x = 0; x < GameWorld.Width; x++)
             {
                 if (!context.IsDiscovered(x, y))
                     continue;
