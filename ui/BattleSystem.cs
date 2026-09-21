@@ -23,6 +23,7 @@ public sealed class BattleSystem
     private readonly ExpeditionState expedition;
     private readonly HashSet<string> defendingActors = new(StringComparer.Ordinal);
     private readonly List<Character> defeatedEnemies = new();
+    private readonly Dictionary<Character, string> enemyIds = new();
     private int turnCursor;
 
     public BattleState State { get; }
@@ -56,17 +57,20 @@ public sealed class BattleSystem
 
         Enemies = enemies.ToList();
 
+        for (int index = 0; index < Enemies.Count; index++)
+            enemyIds[Enemies[index]] = $"{Enemies[index].Name}:{Enemies[index].X}:{Enemies[index].Y}:{index}";
+
         State = new BattleState
         {
             Party = expeditionState.Party.ToList(),
-            Enemies = Enemies.Select((enemy, index) => ToEnemyState(enemy, index)).ToList(),
+            Enemies = Enemies.Select(ToEnemyState).ToList(),
             SelectedCommand = BattleCommand.Attack.ToString(),
             Description = "Choose an action."
         };
 
         BattlePartyController controller = new(State);
         State.SelectedActorId = controller.State.TurnOrder
-            .FirstOrDefault(id => IsLivingPartyMember(id)) ?? State.Party[0].Id;
+            .FirstOrDefault(IsLivingPartyMember) ?? State.Party[0].Id;
 
         State.SelectedTargetId = GetEnemyId(Enemies[0]);
         turnCursor = Math.Max(0, State.TurnOrder.IndexOf(State.SelectedActorId));
@@ -146,7 +150,7 @@ public sealed class BattleSystem
                     CommandMessage = "No healing item is available.";
                     return BattleResult.Continue;
                 }
-                CommandMessage = $"{actor.Name} uses a field ration.";
+                CommandMessage = $"{actor.Name} uses a healing item.";
                 break;
 
             case BattleCommand.Interact:
@@ -283,10 +287,10 @@ public sealed class BattleSystem
         return false;
     }
 
-    private static BattleEnemyState ToEnemyState(Character enemy, int index) =>
+    private BattleEnemyState ToEnemyState(Character enemy) =>
         new()
         {
-            Id = GetEnemyId(enemy, index),
+            Id = GetEnemyId(enemy),
             Name = enemy.Name,
             HP = enemy.HP,
             MaxHP = enemy.MAXHP,
@@ -294,19 +298,14 @@ public sealed class BattleSystem
             Family = "Hollow"
         };
 
-    private static string GetEnemyId(Character enemy, int? index = null) =>
-        index.HasValue
-            ? $"{enemy.Name}:{enemy.X}:{enemy.Y}:{index.Value}"
-            : $"{enemy.Name}:{enemy.X}:{enemy.Y}";
+    private string GetEnemyId(Character enemy) =>
+        enemyIds[enemy];
 
     private void SyncEnemyState()
     {
         foreach (BattleEnemyState enemyState in State.Enemies)
         {
-            Character? enemy = Enemies.FirstOrDefault(candidate =>
-                enemyState.Id == GetEnemyId(candidate) ||
-                enemyState.Name == candidate.Name);
-
+            Character? enemy = Enemies.FirstOrDefault(candidate => GetEnemyId(candidate) == enemyState.Id);
             if (enemy == null) continue;
             enemyState.HP = enemy.HP;
             enemyState.MaxHP = enemy.MAXHP;
