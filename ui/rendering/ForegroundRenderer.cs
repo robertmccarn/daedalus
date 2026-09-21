@@ -7,6 +7,9 @@ public sealed class ForegroundRenderer
     {
         WorldPresentationProfile p = context.Profile;
         long now = AnimationClock.Now;
+        Rectangle viewport = context.Layout.WorldViewport;
+        int width = viewport.Width;
+        int height = viewport.Height;
         var originalSmoothing = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -14,13 +17,13 @@ public sealed class ForegroundRenderer
 
         Point[] leftFraming =
         {
-            new Point(0, 0), new Point(42, 0), new Point(34, 95), new Point(48, 180),
-            new Point(31, 276), new Point(43, 388), new Point(28, 490), new Point(46, 620), new Point(0, 620)
+            new Point(0, 0), new Point(42, 0), new Point(34, (int)(height * 0.15f)), new Point(48, (int)(height * 0.29f)),
+            new Point(31, (int)(height * 0.45f)), new Point(43, (int)(height * 0.63f)), new Point(28, (int)(height * 0.79f)), new Point(46, height), new Point(0, height)
         };
         Point[] rightFraming =
         {
-            new Point(860, 0), new Point(818, 0), new Point(826, 110), new Point(812, 215),
-            new Point(829, 305), new Point(815, 420), new Point(832, 525), new Point(810, 620), new Point(860, 620)
+            new Point(width, 0), new Point(width - 42, 0), new Point(width - 34, (int)(height * 0.18f)), new Point(width - 48, (int)(height * 0.35f)),
+            new Point(width - 31, (int)(height * 0.50f)), new Point(width - 43, (int)(height * 0.68f)), new Point(width - 28, (int)(height * 0.85f)), new Point(width - 46, height), new Point(width, height)
         };
         g.FillPolygon(side, leftFraming);
         g.FillPolygon(side, rightFraming);
@@ -28,27 +31,27 @@ public sealed class ForegroundRenderer
         using Brush bottom = new SolidBrush(Color.FromArgb(135, p.Foreground.R, p.Foreground.G, p.Foreground.B));
         Point[] debrisBand =
         {
-            new Point(0, 605), new Point(85, 575), new Point(150, 592), new Point(230, 565),
-            new Point(315, 598), new Point(390, 578), new Point(470, 603), new Point(545, 573),
-            new Point(625, 596), new Point(705, 566), new Point(780, 592), new Point(860, 575),
-            new Point(860, 620), new Point(0, 620)
+            new Point(0, (int)(height * 0.976f)), new Point((int)(width * 0.10f), (int)(height * 0.927f)), new Point((int)(width * 0.175f), (int)(height * 0.953f)), new Point((int)(width * 0.27f), (int)(height * 0.911f)),
+            new Point((int)(width * 0.366f), (int)(height * 0.965f)), new Point((int)(width * 0.454f), (int)(height * 0.932f)), new Point((int)(width * 0.547f), (int)(height * 0.973f)), new Point((int)(width * 0.634f), (int)(height * 0.924f)),
+            new Point((int)(width * 0.727f), (int)(height * 0.961f)), new Point((int)(width * 0.82f), (int)(height * 0.91f)), new Point((int)(width * 0.907f), (int)(height * 0.953f)), new Point(width, (int)(height * 0.927f)),
+            new Point(width, height), new Point(0, height)
         };
         g.FillPolygon(bottom, debrisBand);
 
         using Pen edge = new(Color.FromArgb(120, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 2);
-        g.DrawLine(edge, 42, 0, 34, 95);
-        g.DrawLine(edge, 34, 95, 48, 180);
-        g.DrawLine(edge, 818, 0, 826, 110);
-        g.DrawLine(edge, 826, 110, 812, 215);
+        g.DrawLine(edge, 42, 0, 34, (int)(height * 0.15f));
+        g.DrawLine(edge, 34, (int)(height * 0.15f), 48, (int)(height * 0.29f));
+        g.DrawLine(edge, width - 42, 0, width - 34, (int)(height * 0.18f));
+        g.DrawLine(edge, width - 34, (int)(height * 0.18f), width - 48, (int)(height * 0.35f));
 
         using Brush hanging = new SolidBrush(Color.FromArgb(155, p.Foreground.R, p.Foreground.G, p.Foreground.B));
         Point[] fragmentLeft =
         {
-            new Point(92, 0), new Point(118, 0), new Point(114, 58), new Point(104, 77), new Point(97, 48)
+            new Point((int)(width * 0.107f), 0), new Point((int)(width * 0.137f), 0), new Point((int)(width * 0.132f), 58), new Point((int)(width * 0.121f), 77), new Point((int)(width * 0.113f), 48)
         };
         Point[] fragmentRight =
         {
-            new Point(738, 0), new Point(765, 0), new Point(761, 43), new Point(750, 63), new Point(744, 31)
+            new Point((int)(width * 0.858f), 0), new Point((int)(width * 0.89f), 0), new Point((int)(width * 0.886f), 43), new Point((int)(width * 0.872f), 63), new Point((int)(width * 0.865f), 31)
         };
         float leftSway = AnimationClock.Sine(now, 3100, 17) * 3f;
         float rightSway = AnimationClock.Sine(now, 3600, 29) * 4f;
