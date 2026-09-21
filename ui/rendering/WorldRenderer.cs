@@ -29,7 +29,7 @@ public sealed class WorldRenderer
                     continue;
                 }
 
-                DrawTile(g, context, x, y, world.Dungeon[y, x], p);
+                DrawTile(g, context, x, y, world.Dungeon[y, x], p, now);
 
                 if (!context.IsVisible(x, y))
                 {
@@ -46,7 +46,8 @@ public sealed class WorldRenderer
         int x,
         int y,
         Tile tile,
-        WorldPresentationProfile p)
+        WorldPresentationProfile p,
+        long now)
     {
         Point s = context.ToScreen(new GridPosition(x, y));
         int z = tile.Elevation * 4;
