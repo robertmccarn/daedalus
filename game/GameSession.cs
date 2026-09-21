@@ -440,18 +440,14 @@ public class GameSession
 
         foreach (PartyMember member in StateManager.Campaign.PartyRoster.Take(4))
         {
-            int baseMaxHp = member.SpriteId.ToLowerInvariant() switch
-            {
-                "marek" => 36,
-                "lyra" => 24,
-                "sera" => 26,
-                _ => 30
-            };
-
-            int baseStrength = member.Stats.Strength;
-            int baseMagic = member.Stats.Magic;
-            int baseAgility = member.Stats.Agility;
-            int baseLuck = member.Stats.Luck;
+            (int baseMaxHp, int baseStrength, int baseMagic, int baseAgility, int baseLuck) =
+                member.SpriteId.ToLowerInvariant() switch
+                {
+                    "lyra" => (24, 4, 9, 7, 6),
+                    "marek" => (36, 10, 2, 3, 4),
+                    "sera" => (26, 6, 7, 9, 8),
+                    _ => (30, 8, 3, 6, 5)
+                };
 
             member.Level = level;
             member.Experience = 0;
@@ -464,7 +460,7 @@ public class GameSession
                 Strength = baseStrength + levelDelta,
                 Magic = baseMagic + levelDelta,
                 Agility = baseAgility + levelDelta,
-                Luck = baseLuck + Math.Min(levelDelta, floor)
+                Luck = baseLuck + Math.Min(levelDelta, 10)
             };
             member.Morale = 100;
             member.EquippedGearIds.Clear();
