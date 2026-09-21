@@ -243,7 +243,10 @@ public class GameWindow : Form
             session.CurrentObjective,
             session.IsCellDiscovered,
             session.IsCellVisible,
-            session.StateManager);
+            session.StateManager,
+            session.DevMenuOpen,
+            session.DevSelectedFloor,
+            session.DevPartyLevel);
     }
 
     protected override void Dispose(bool disposing)
