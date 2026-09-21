@@ -6,6 +6,7 @@ public sealed class ForegroundRenderer
     public void Draw(Graphics g, ExplorationRenderContext context)
     {
         WorldPresentationProfile p = context.Profile;
+        long now = AnimationClock.Now;
         var originalSmoothing = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -49,8 +50,16 @@ public sealed class ForegroundRenderer
         {
             new Point(738, 0), new Point(765, 0), new Point(761, 43), new Point(750, 63), new Point(744, 31)
         };
+        float leftSway = AnimationClock.Sine(now, 3100, 17) * 3f;
+        float rightSway = AnimationClock.Sine(now, 3600, 29) * 4f;
+
+        g.TranslateTransform(leftSway, 0f);
         g.FillPolygon(hanging, fragmentLeft);
+        g.ResetTransform();
+
+        g.TranslateTransform(rightSway, 0f);
         g.FillPolygon(hanging, fragmentRight);
+        g.ResetTransform();
 
         g.SmoothingMode = originalSmoothing;
     }
