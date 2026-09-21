@@ -44,6 +44,14 @@ public sealed class BattleSystem
     public BattleAnimationEvent? GetActiveAnimation(long now) =>
         animationQueue.GetActive(now);
 
+    public PartyMember? GetPartyMember(string id) =>
+        State.Party.FirstOrDefault(member => member.Id == id);
+
+    public Character? GetEnemyByPresentationId(string id) =>
+        Enemies.FirstOrDefault(enemy => GetEnemyId(enemy) == id);
+
+    public string GetEnemyPresentationId(Character enemy) => GetEnemyId(enemy);
+
     public PartyMember? SelectedActor =>
         IsCurrentPartyActor
             ? State.Party.FirstOrDefault(member =>
