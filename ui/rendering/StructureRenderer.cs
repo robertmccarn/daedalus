@@ -9,14 +9,14 @@ public sealed class StructureRenderer
         foreach (StaticUnit unit in context.World.StaticUnits.OrderBy(unit => unit.Y).ThenBy(unit => unit.X))
         {
             GridPosition pos = new(unit.X, unit.Y);
-            if (!context.IsDiscovered(unit.X, unit.Y) || !context.Visible(pos)) continue;
+            if (!context.IsDiscovered(unit.X, unit.Y) || !context.IsVisible(unit.X, unit.Y) || !context.Visible(pos)) continue;
             DrawStaticUnit(g, context, unit, p);
         }
 
         foreach (InteractiveProp prop in context.World.Props.OrderBy(prop => prop.Y).ThenBy(prop => prop.X))
         {
             GridPosition pos = new(prop.X, prop.Y);
-            if (!context.IsDiscovered(prop.X, prop.Y) || !context.Visible(pos)) continue;
+            if (!context.IsDiscovered(prop.X, prop.Y) || !context.IsVisible(prop.X, prop.Y) || !context.Visible(pos)) continue;
             DrawInteractiveProp(g, context, prop, p);
         }
     }
