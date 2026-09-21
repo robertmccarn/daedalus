@@ -9,9 +9,10 @@ public sealed class StructureRenderer
         long now = AnimationClock.Now;
 
         foreach (StaticUnit unit in context.World.StaticUnits
-                     .OrderBy(unit => GetElevation(context, unit.X, unit.Y))
-                     .ThenBy(unit => unit.Y)
-                     .ThenBy(unit => unit.X))
+                     .OrderBy(unit => RenderDepth.WorldObject(
+                         GetElevation(context, unit.X, unit.Y),
+                         unit.Y,
+                         unit.X)))
         {
             GridPosition pos = new(unit.X, unit.Y);
             if (!context.IsDiscovered(unit.X, unit.Y) ||
@@ -23,9 +24,10 @@ public sealed class StructureRenderer
         }
 
         foreach (InteractiveProp prop in context.World.Props
-                     .OrderBy(prop => GetElevation(context, prop.X, prop.Y))
-                     .ThenBy(prop => prop.Y)
-                     .ThenBy(prop => prop.X))
+                     .OrderBy(prop => RenderDepth.WorldObject(
+                         GetElevation(context, prop.X, prop.Y),
+                         prop.Y,
+                         prop.X)))
         {
             GridPosition pos = new(prop.X, prop.Y);
             if (!context.IsDiscovered(prop.X, prop.Y) ||
