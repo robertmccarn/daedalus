@@ -15,30 +15,18 @@ public sealed class PartyController
     public IReadOnlyList<PartyMemberRuntime> Members => members;
     public GridPosition LeaderPosition => GetLeaderRuntime().Position;
 
-    public PartyController(GameWorld world)
-    {
-        this.world = world;
-    }
+    public PartyController(GameWorld world) { this.world = world; }
 
-    public void Initialize(
-        ExpeditionState expedition,
-        GridPosition leaderPosition,
-        string? leaderId = null,
-        PartyFormationType? formation = null)
+    public void Initialize(ExpeditionState expedition, GridPosition leaderPosition, string? leaderId = null, PartyFormationType? formation = null)
     {
         members.Clear();
         history.Clear();
         step = 0;
-
-        if (expedition.Party.Count == 0)
-            throw new InvalidOperationException("An expedition must contain at least one party member.");
+        if (expedition.Party.Count == 0) throw new InvalidOperationException("An expedition must contain at least one party member.");
 
         LeaderId = leaderId ?? expedition.LeaderId;
-        if (string.IsNullOrWhiteSpace(LeaderId) ||
-            expedition.Party.All(member => member.Id != LeaderId))
-        {
+        if (string.IsNullOrWhiteSpace(LeaderId) || expedition.Party.All(member => member.Id != LeaderId))
             LeaderId = expedition.Party[0].Id;
-        }
 
         Formation = formation ?? expedition.Formation;
         if (!world.IsWalkable(leaderPosition.X, leaderPosition.Y))
@@ -61,16 +49,8 @@ public sealed class PartyController
         SyncExpedition(expedition);
     }
 
-    public void Load(
-        ExpeditionState expedition,
-        GridPosition leaderPosition)
-    {
-        Initialize(
-            expedition,
-            leaderPosition,
-            expedition.LeaderId,
-            expedition.Formation);
-    }
+    public void Load(ExpeditionState expedition, GridPosition leaderPosition) =>
+        Initialize(expedition, leaderPosition, expedition.LeaderId, expedition.Formation);
 
     public MoveResult TryMoveLeader(CharacterDirection direction, ExpeditionState expedition)
     {
@@ -80,15 +60,10 @@ public sealed class PartyController
         leader.IsMoving = false;
 
         GridPosition target = Step(leader.Position, direction);
+        if (!world.IsWalkable(target.X, target.Y)) return MoveResult.Blocked;
+        if (world.GetEnemyAt(target.X, target.Y) != null) return MoveResult.Encounter;
 
-        if (!world.IsWalkable(target.X, target.Y))
-            return MoveResult.Blocked;
-
-        if (world.GetEnemyAt(target.X, target.Y) != null)
-            return MoveResult.Encounter;
-
-        GridPosition oldLeaderPosition = leader.Position;
-        leader.PreviousPosition = oldLeaderPosition;
+        leader.PreviousPosition = leader.Position;
         leader.Position = target;
         leader.AnimationState = CharacterAnimationState.Walk;
         leader.IsMoving = true;
@@ -96,8 +71,7 @@ public sealed class PartyController
 
         step++;
         history.Enqueue(new PartyHistoryEntry(step, target, direction));
-        while (history.Count > HistoryLimit)
-            history.Dequeue();
+        while (history.Count > HistoryLimit) history.Dequeue();
 
         ResolveFollowerMovement();
         SyncExpedition(expedition);
@@ -129,15 +103,11 @@ public sealed class PartyController
         }
     }
 
-    public PartyMemberRuntime GetLeaderRuntime() =>
-        members.First(member => member.MemberId == LeaderId);
+    public PartyMemberRuntime GetLeaderRuntime() => members.First(member => member.MemberId == LeaderId);
+    public PartyMemberRuntime? GetRuntime(string memberId) => members.FirstOrDefault(runtime => runtime.MemberId == memberId);
 
-    public PartyMemberRuntime? GetRuntime(string memberId) =>
-        members.FirstOrDefault(member => member.MemberId == memberId);
-
-    public IReadOnlyList<PartyRenderData> GetRenderData(ExpeditionState expedition)
-    {
-        return members.Select((runtime, index) =>
+    public IReadOnlyList<PartyRenderData> GetRenderData(ExpeditionState expedition) =>
+        members.Select((runtime, index) =>
         {
             PartyMember? member = expedition.Party.FirstOrDefault(candidate => candidate.Id == runtime.MemberId);
             return new PartyRenderData(
@@ -146,11 +116,11 @@ public sealed class PartyController
                 runtime.Position,
                 runtime.Direction,
                 runtime.AnimationState,
+                runtime.AnimationTick,
                 member?.SpriteId ?? string.Empty,
                 index,
                 runtime.MemberId == LeaderId);
         }).ToList();
-    }
 
     private void ReformAt(GridPosition leaderPosition)
     {
@@ -162,19 +132,13 @@ public sealed class PartyController
 
         HashSet<GridPosition> occupied = new() { leaderPosition };
         IReadOnlyList<GridPosition> offsets = FormationOffsets.GetOffsets(Formation, leader.Direction, Math.Max(0, members.Count - 1));
-
         IReadOnlyList<PartyMemberRuntime> followers = GetFollowers();
+
         for (int i = 0; i < followers.Count; i++)
         {
             PartyMemberRuntime follower = followers[i];
             GridPosition desired = Add(leaderPosition, offsets[i]);
-            GridPosition resolved = ResolvePosition(
-                follower,
-                desired,
-                leaderPosition,
-                occupied,
-                new HashSet<GridPosition>(),
-                fallbackOrigin: leaderPosition);
+            GridPosition resolved = ResolvePosition(follower, desired, leaderPosition, occupied, new HashSet<GridPosition>(), leaderPosition);
 
             follower.Direction = leader.Direction;
             follower.Position = resolved;
@@ -192,8 +156,8 @@ public sealed class PartyController
         List<FollowerMovementIntent> intents = new();
         IReadOnlyList<PartyHistoryEntry> historySnapshot = history.ToArray();
         IReadOnlyList<GridPosition> offsets = FormationOffsets.GetOffsets(Formation, leader.Direction, Math.Max(0, members.Count - 1));
-
         IReadOnlyList<PartyMemberRuntime> followers = GetFollowers();
+
         for (int i = 0; i < followers.Count; i++)
         {
             PartyMemberRuntime follower = followers[i];
@@ -203,139 +167,78 @@ public sealed class PartyController
         }
 
         HashSet<GridPosition> occupied = new() { leader.Position };
-        HashSet<GridPosition> reservedCurrentPositions = followers
-            .Select(follower => follower.Position)
-            .Where(position => position != leader.Position)
-            .ToHashSet();
+        HashSet<GridPosition> reservedCurrentPositions = followers.Select(follower => follower.Position).Where(position => position != leader.Position).ToHashSet();
 
         foreach (FollowerMovementIntent intent in intents)
         {
             PartyMemberRuntime follower = members.First(member => member.MemberId == intent.MemberId);
             reservedCurrentPositions.Remove(follower.Position);
 
-            GridPosition resolved = ResolvePosition(
-                follower,
-                intent.DesiredPosition,
-                leader.Position,
-                occupied,
-                reservedCurrentPositions,
-                intent.CurrentPosition);
-
+            GridPosition resolved = ResolvePosition(follower, intent.DesiredPosition, leader.Position, occupied, reservedCurrentPositions, intent.CurrentPosition);
             follower.Direction = leader.Direction;
             follower.PreviousPosition = follower.Position;
             follower.Position = resolved;
             follower.IsMoving = resolved != follower.PreviousPosition;
-            follower.AnimationState = follower.IsMoving
-                ? CharacterAnimationState.Walk
-                : CharacterAnimationState.Idle;
+            follower.AnimationState = follower.IsMoving ? CharacterAnimationState.Walk : CharacterAnimationState.Idle;
             follower.AnimationTick = 0;
             follower.StallSteps = resolved == intent.DesiredPosition ? 0 : follower.StallSteps + 1;
             occupied.Add(resolved);
         }
     }
 
-    private IReadOnlyList<PartyMemberRuntime> GetFollowers() =>
-        members.Where(member => member.MemberId != LeaderId).ToList();
+    private IReadOnlyList<PartyMemberRuntime> GetFollowers() => members.Where(member => member.MemberId != LeaderId).ToList();
 
-    private GridPosition ResolvePosition(
-        PartyMemberRuntime follower,
-        GridPosition desired,
-        GridPosition leaderPosition,
-        HashSet<GridPosition> occupied,
-        HashSet<GridPosition> reservedCurrentPositions,
-        GridPosition fallbackOrigin)
+    private GridPosition ResolvePosition(PartyMemberRuntime follower, GridPosition desired, GridPosition leaderPosition, HashSet<GridPosition> occupied, HashSet<GridPosition> reservedCurrentPositions, GridPosition fallbackOrigin)
     {
         foreach (GridPosition candidate in CandidatePositions(desired, fallbackOrigin))
         {
-            if (candidate == leaderPosition ||
-                occupied.Contains(candidate) ||
-                reservedCurrentPositions.Contains(candidate))
-                continue;
-
-            if (IsValidPartyPosition(candidate))
-                return candidate;
+            if (candidate == leaderPosition || occupied.Contains(candidate) || reservedCurrentPositions.Contains(candidate)) continue;
+            if (IsValidPartyPosition(candidate)) return candidate;
         }
 
-        // The follower's current cell is released from the reservation before
-        // resolution, so this is a deterministic stall rather than an overlap.
-        if (follower.Position != leaderPosition &&
-            !occupied.Contains(follower.Position) &&
-            IsValidPartyPosition(follower.Position))
-        {
+        if (follower.Position != leaderPosition && !occupied.Contains(follower.Position) && IsValidPartyPosition(follower.Position))
             return follower.Position;
-        }
 
         return FindNearestValidPosition(fallbackOrigin, leaderPosition, occupied, reservedCurrentPositions);
     }
 
     private bool IsValidPartyPosition(GridPosition position) =>
-        world.IsWalkable(position.X, position.Y) &&
-        world.GetEnemyAt(position.X, position.Y) == null;
+        world.IsWalkable(position.X, position.Y) && world.GetEnemyAt(position.X, position.Y) == null;
 
-    private GridPosition FindNearestValidPosition(
-        GridPosition origin,
-        GridPosition leaderPosition,
-        HashSet<GridPosition> occupied,
-        HashSet<GridPosition> reservedCurrentPositions)
+    private GridPosition FindNearestValidPosition(GridPosition origin, GridPosition leaderPosition, HashSet<GridPosition> occupied, HashSet<GridPosition> reservedCurrentPositions)
     {
         const int maxRadius = 4;
-
         for (int radius = 1; radius <= maxRadius; radius++)
-        {
             foreach (GridPosition candidate in RingPositions(origin, radius))
             {
-                if (candidate == leaderPosition ||
-                    occupied.Contains(candidate) ||
-                    reservedCurrentPositions.Contains(candidate))
-                    continue;
-
-                if (IsValidPartyPosition(candidate))
-                    return candidate;
+                if (candidate == leaderPosition || occupied.Contains(candidate) || reservedCurrentPositions.Contains(candidate)) continue;
+                if (IsValidPartyPosition(candidate)) return candidate;
             }
-        }
-
-        // Generated floors should never reach this point. Returning the origin
-        // keeps the result deterministic if the world is temporarily exhausted.
         return origin;
     }
 
-    private static IEnumerable<GridPosition> CandidatePositions(
-        GridPosition desired,
-        GridPosition fallbackOrigin)
+    private static IEnumerable<GridPosition> CandidatePositions(GridPosition desired, GridPosition fallbackOrigin)
     {
         yield return desired;
         yield return fallbackOrigin;
-
-        foreach (GridPosition candidate in RingPositions(desired, 1))
-            yield return candidate;
-
-        foreach (GridPosition candidate in RingPositions(fallbackOrigin, 1))
-            yield return candidate;
-
-        foreach (GridPosition candidate in RingPositions(desired, 2))
-            yield return candidate;
+        foreach (GridPosition candidate in RingPositions(desired, 1)) yield return candidate;
+        foreach (GridPosition candidate in RingPositions(fallbackOrigin, 1)) yield return candidate;
+        foreach (GridPosition candidate in RingPositions(desired, 2)) yield return candidate;
     }
 
-    private static IEnumerable<GridPosition> RingPositions(
-        GridPosition center,
-        int radius)
+    private static IEnumerable<GridPosition> RingPositions(GridPosition center, int radius)
     {
         for (int dx = -radius; dx <= radius; dx++)
         {
             int dy = radius - Math.Abs(dx);
             yield return new GridPosition(center.X + dx, center.Y - dy);
-            if (dy != 0)
-                yield return new GridPosition(center.X + dx, center.Y + dy);
+            if (dy != 0) yield return new GridPosition(center.X + dx, center.Y + dy);
         }
     }
 
-    private static GridPosition GetHistoricalLeaderPosition(
-        IReadOnlyList<PartyHistoryEntry> entries,
-        int followerSlot)
+    private static GridPosition GetHistoricalLeaderPosition(IReadOnlyList<PartyHistoryEntry> entries, int followerSlot)
     {
-        if (entries.Count == 0)
-            return default;
-
+        if (entries.Count == 0) return default;
         int delay = Math.Max(1, followerSlot * FollowerDelay);
         int index = Math.Max(0, entries.Count - delay);
         return entries[index].LeaderPosition;
@@ -353,12 +256,10 @@ public sealed class PartyController
         CharacterDirection.Up => new GridPosition(position.X, position.Y - 1),
         CharacterDirection.Down => new GridPosition(position.X, position.Y + 1),
         CharacterDirection.Left => new GridPosition(position.X - 1, position.Y),
-        CharacterDirection.Right => new GridPosition(position.X + 1, position.Y),
-        _ => position
+        _ => new GridPosition(position.X + 1, position.Y)
     };
 
-    private static GridPosition Add(GridPosition position, GridPosition offset) =>
-        new(position.X + offset.X, position.Y + offset.Y);
+    private static GridPosition Add(GridPosition position, GridPosition offset) => new(position.X + offset.X, position.Y + offset.Y);
 }
 
 public enum PartyFormationType
@@ -371,10 +272,7 @@ public enum PartyFormationType
 
 public static class FormationOffsets
 {
-    public static IReadOnlyList<GridPosition> GetOffsets(
-        PartyFormationType formation,
-        CharacterDirection direction,
-        int count)
+    public static IReadOnlyList<GridPosition> GetOffsets(PartyFormationType formation, CharacterDirection direction, int count)
     {
         List<GridPosition> offsets = new();
         for (int i = 0; i < count; i++)
@@ -386,12 +284,7 @@ public static class FormationOffsets
         return offsets;
     }
 
-    private static GridPosition GetOffset(
-        PartyFormationType formation,
-        CharacterDirection direction,
-        int rank,
-        int side,
-        int index)
+    private static GridPosition GetOffset(PartyFormationType formation, CharacterDirection direction, int rank, int side, int index)
     {
         (GridPosition forward, GridPosition right) = direction switch
         {
