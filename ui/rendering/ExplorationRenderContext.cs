@@ -7,6 +7,8 @@ public sealed class ExplorationRenderContext
     public ExpeditionState Expedition { get; }
     public PartyController Party { get; }
     public Func<int, int, bool> IsDiscovered { get; }
+    public string CurrentObjective { get; }
+    public string Message { get; }
     public int CameraX { get; }
     public int CameraY { get; }
     public int TileSize { get; } = 28;
@@ -17,12 +19,16 @@ public sealed class ExplorationRenderContext
         GameWorld world,
         PartyController party,
         ExpeditionState expedition,
-        Func<int, int, bool> isDiscovered)
+        Func<int, int, bool> isCellDiscovered,
+        string currentObjective,
+        string message)
     {
         World = world;
         Party = party;
         Expedition = expedition;
-        IsDiscovered = isDiscovered;
+        IsDiscovered = isCellDiscovered;
+        CurrentObjective = currentObjective;
+        Message = message;
 
         GridPosition leader = party.LeaderPosition;
         CameraX = leader.X * TileSize - 420;
