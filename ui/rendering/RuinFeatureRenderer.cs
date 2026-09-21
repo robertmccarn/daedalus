@@ -15,7 +15,7 @@ public sealed class RuinFeatureRenderer
                      .ThenBy(feature => feature.Type))
         {
             GridPosition position = new(feature.X, feature.Y);
-            if (!context.IsDiscovered(feature.X, feature.Y) || !context.Visible(position))
+            if (!context.IsDiscovered(feature.X, feature.Y) || !context.IsVisible(feature.X, feature.Y) || !context.Visible(position))
                 continue;
 
             switch (feature.Type)
