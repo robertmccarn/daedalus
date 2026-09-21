@@ -5,6 +5,7 @@ public class ExplorationRenderer : IDisposable
 {
     private readonly BackdropRenderer backdropRenderer = new();
     private readonly WorldRenderer worldRenderer = new();
+    private readonly RuinFeatureRenderer ruinFeatureRenderer = new();
     private readonly StructureRenderer structureRenderer = new();
     private readonly EntityRenderer entityRenderer = new();
     private readonly ForegroundRenderer foregroundRenderer = new();
@@ -34,6 +35,7 @@ public class ExplorationRenderer : IDisposable
 
         backdropRenderer.Draw(graphics, context);
         worldRenderer.Draw(graphics, context);
+        ruinFeatureRenderer.Draw(graphics, context);
         structureRenderer.Draw(graphics, context);
         entityRenderer.Draw(graphics, context);
         effectRenderer.Draw(graphics, context);
