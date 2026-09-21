@@ -132,4 +132,19 @@ public class Phase5To9Tests
         Assert.Equal("Reach the extraction point.", context.CurrentObjective);
         Assert.Equal("Supplies recovered.", context.Message);
     }
+
+    [Fact]
+    public void GameWorld_AuthoredRoomFeatures_AreDeterministicAndRenderOnly()
+    {
+        GameWorld first = new(1, 12345);
+        GameWorld second = new(1, 12345);
+
+        Assert.Equal(first.VisualFeatures, second.VisualFeatures);
+        Assert.Contains(first.VisualFeatures, feature => feature.Type == WorldVisualFeatureType.Abyss);
+        Assert.Contains(first.VisualFeatures, feature => feature.Type == WorldVisualFeatureType.Bridge);
+        Assert.Contains(first.VisualFeatures, feature => feature.Type == WorldVisualFeatureType.Pillar);
+        Assert.Contains(first.VisualFeatures, feature => feature.Type == WorldVisualFeatureType.Landmark);
+
+        Assert.True(first.IsWalkable(first.SpawnX, first.SpawnY + 3));
+    }
 }
