@@ -135,6 +135,82 @@ public class Phase5To9Tests
     }
 
     [Fact]
+    public void VisibilitySystem_BlocksLineOfSightThroughWalls()
+    {
+        GameWorld world = new(1, 12345);
+        GridPosition origin = new(world.SpawnX, world.SpawnY);
+        GridPosition wall = new(world.SpawnX + 1, world.SpawnY);
+        GridPosition target = new(world.SpawnX + 2, world.SpawnY);
+
+        world.Dungeon[wall.Y, wall.X] = new Tile(TileType.Wall, false, true);
+
+        Assert.True(VisibilitySystem.IsVisible(world, origin, wall));
+        Assert.False(VisibilitySystem.IsVisible(world, origin, target));
+    }
+
+    [Fact]
+    public void GameSession_ExtractionReturnsToCampaignAndCanRestart()
+    {
+        GameSession session = new(new GameWorld(1, 12345));
+
+        session.Party.Initialize(
+            session.StateManager.ActiveExpedition,
+            new GridPosition(session.World.ExitX, session.World.ExitY));
+
+        Assert.True(session.ExtractExpedition());
+        Assert.Equal(GameState.ExtractionResults, session.State);
+        Assert.NotNull(session.LastExtraction);
+        Assert.True(session.LastExtraction!.CampaignRunsAfter >= 1);
+
+        session.ReturnToCampaign();
+        Assert.Equal(GameState.Campaign, session.State);
+
+        session.StartNewExpeditionFromCampaign();
+        Assert.Equal(GameState.Exploration, session.State);
+        Assert.Equal("Active", session.StateManager.ActiveExpedition.ExtractionState);
+    }
+
+    [Fact]
+    public void BattleSystem_SkillAppliesPoisonStatus()
+    {
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember
+                {
+                    Id = "arden",
+                    Name = "Arden",
+                    HP = 40,
+                    MaxHP = 40,
+                    MP = 10,
+                    MaxMP = 10,
+                    Stats = new StatsData { Strength = 6, Agility = 12 }
+                }
+            }
+        };
+
+        Character enemy = new(
+            "Hollow Guard",
+            60,
+            1,
+            new Stats(4, 2, 3, 2),
+            10,
+            10);
+
+        BattleSystem battle = new(expedition, new[] { enemy });
+        battle.SelectNextCommand();
+        battle.SelectNextCommand();
+
+        Assert.Equal(BattleCommand.Skill, battle.SelectedCommand);
+
+        battle.PerformPlayerTurn(out _, out _);
+
+        Assert.True(battle.HasStatus("Hollow Guard:10:10:0", "Poisoned"));
+        Assert.True(enemy.HP < 60);
+    }
+
+    [Fact]
     public void ContentCatalog_ProvidesProductionRecipes()
     {
         CampaignState campaign = new();
