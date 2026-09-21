@@ -129,9 +129,8 @@ public class Phase5To9Tests
 
         battle.SelectNextCommand(); // Skill
         battle.PerformPlayerTurn(out _, out _);
-        Assert.True(battle.HasStatus(battle.Enemies[0] == enemyA ? "Hollow Guard:10:10:0" : "Hollow Stalker:12:10:1", "Poisoned") ||
-                    battle.HasStatus("Hollow Guard:10:10:0", "Poisoned") ||
-                    battle.HasStatus("Hollow Stalker:12:10:1", "Poisoned"));
+        Assert.Equal("arden", battle.SelectedActor?.Id);
+        Assert.True(battle.HasStatus(enemyA, "Exposed"));
     }
 
     [Fact]
@@ -208,8 +207,8 @@ public class Phase5To9Tests
             {
                 new PartyMember
                 {
-                    Id = "arden",
-                    Name = "Arden",
+                    Id = "lyra",
+                    Name = "Lyra",
                     HP = 50,
                     MaxHP = 50,
                     MP = 10,
@@ -227,8 +226,8 @@ public class Phase5To9Tests
 
         battle.PerformPlayerTurn(out int damage, out _);
 
-        Assert.Equal(17, damage);
-        Assert.Equal(83, enemy.HP);
+        Assert.Equal(21, damage);
+        Assert.Equal(79, enemy.HP);
     }
 
     [Fact]
@@ -311,7 +310,8 @@ public class Phase5To9Tests
                     MaxHP = 40,
                     MP = 10,
                     MaxMP = 10,
-                    Stats = new StatsData { Strength = 6, Agility = 12 }
+                    SpriteId = "lyra",
+                    Stats = new StatsData { Strength = 1, Magic = 6, Agility = 12 }
                 }
             }
         };
