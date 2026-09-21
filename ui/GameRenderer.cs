@@ -26,6 +26,7 @@ public class GameRenderer : IDisposable
         GameState gameState,
         BattleSystem? battle,
         ExtractionSummary? extraction,
+        FeedbackEffect? feedback,
         string message,
         string currentObjective,
         Func<int, int, bool> isCellDiscovered,
@@ -50,7 +51,7 @@ public class GameRenderer : IDisposable
                 explorationRenderer.Draw(
                     graphics, world, party, expedition,
                     isCellDiscovered, isCellVisible,
-                    currentObjective, message);
+                    currentObjective, message, feedback);
                 return;
         }
     }
