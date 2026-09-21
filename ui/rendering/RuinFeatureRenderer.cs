@@ -11,10 +11,11 @@ public sealed class RuinFeatureRenderer
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         foreach (WorldVisualFeature feature in context.World.VisualFeatures
-                     .OrderBy(feature => feature.Elevation)
-                     .ThenBy(feature => feature.Y)
-                     .ThenBy(feature => feature.X)
-                     .ThenBy(feature => feature.Type))
+                     .OrderBy(feature => RenderDepth.WorldObject(
+                         feature.Elevation,
+                         feature.Y,
+                         feature.X,
+                         (int)feature.Type)))
         {
             GridPosition position = new(feature.X, feature.Y);
             if (!context.IsDiscovered(feature.X, feature.Y) ||
