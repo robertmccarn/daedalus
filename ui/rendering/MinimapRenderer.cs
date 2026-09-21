@@ -15,17 +15,18 @@ public sealed class MinimapRenderer
         int oy = bounds.Y + (bounds.Height - cell * GameWorld.Height) / 2;
 
         for (int y = 0; y < GameWorld.Height; y++)
+        for (int x = 0; x < GameWorld.Width; x++)
         {
-            for (int x = 0; x < GameWorld.Width; x++)
-            {
-                if (!context.IsDiscovered(x, y))
-                    continue;
+            if (!context.IsDiscovered(x, y))
+                continue;
 
-                Tile tile = context.World.Dungeon[y, x];
-                Color c = tile.IsWalkable ? context.Profile.Floor : context.Profile.Wall;
-                using Brush b = new SolidBrush(c);
-                g.FillRectangle(b, ox + x * cell, oy + y * cell, cell, cell);
-            }
+            Tile tile = context.World.Dungeon[y, x];
+            Color c = tile.IsWalkable ? context.Profile.Floor : context.Profile.Wall;
+            if (!context.IsVisible(x, y))
+                c = Color.FromArgb(Math.Max(0, c.R - 28), Math.Max(0, c.G - 28), Math.Max(0, c.B - 28));
+
+            using Brush b = new SolidBrush(c);
+            g.FillRectangle(b, ox + x * cell, oy + y * cell, cell, cell);
         }
 
         foreach (DungeonNode node in context.World.Nodes)
