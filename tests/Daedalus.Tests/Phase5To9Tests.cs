@@ -86,6 +86,49 @@ public class Phase5To9Tests
     }
 
     [Fact]
+    public void BattleSystem_UsesFourPersonPartyAndMultipleEnemies()
+    {
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember { Id = "arden", Name = "Arden", HP = 40, MaxHP = 40, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 8, Agility = 8 } },
+                new PartyMember { Id = "lyra", Name = "Lyra", HP = 35, MaxHP = 35, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 5, Agility = 12 } },
+                new PartyMember { Id = "marek", Name = "Marek", HP = 50, MaxHP = 50, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 11, Agility = 3 } },
+                new PartyMember { Id = "sera", Name = "Sera", HP = 36, MaxHP = 36, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 6, Agility = 10 } }
+            },
+            CarriedInventory = new()
+            {
+                new InventoryItem { Id = "healing-tonic", Name = "Healing Tonic", Quantity = 1 }
+            }
+        };
+
+        Character enemyA = new("Hollow Guard", 40, 1, new Stats(5, 2, 4, 2), 10, 10);
+        Character enemyB = new("Hollow Stalker", 34, 1, new Stats(4, 3, 6, 4), 12, 10);
+
+        BattleSystem battle = new(expedition, new[] { enemyA, enemyB });
+
+        Assert.Equal(4, battle.Party.Count);
+        Assert.Equal(2, battle.Enemies.Count);
+        Assert.Equal("lyra", battle.SelectedActor?.Id);
+        Assert.Same(enemyA, battle.SelectedTarget);
+
+        battle.SelectNextTarget();
+        Assert.Same(enemyB, battle.SelectedTarget);
+
+        battle.SelectPreviousCommand();
+        Assert.Equal(BattleCommand.Run, battle.SelectedCommand);
+
+        battle.SelectNextCommand();
+        Assert.Equal(BattleCommand.Attack, battle.SelectedCommand);
+
+        BattleResult result = battle.PerformPlayerTurn(out int damage, out _);
+        Assert.Equal(BattleResult.Continue, result);
+        Assert.True(damage > 0);
+        Assert.NotEqual("lyra", battle.SelectedActor?.Id);
+    }
+
+    [Fact]
     public void ContentCatalog_ProvidesProductionRecipes()
     {
         CampaignState campaign = new();
@@ -126,11 +169,19 @@ public class Phase5To9Tests
             party,
             expedition,
             (_, _) => true,
+            (_, _) => true,
             "Reach the extraction point.",
-            "Supplies recovered.");
+            "Supplies recovered.",
+            new FeedbackEffect(
+                FeedbackEffectType.Loot,
+                world.SpawnX,
+                world.SpawnY,
+                Environment.TickCount64,
+                900));
 
         Assert.Equal("Reach the extraction point.", context.CurrentObjective);
         Assert.Equal("Supplies recovered.", context.Message);
+        Assert.NotNull(context.Feedback);
     }
 
     [Fact]
