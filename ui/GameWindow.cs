@@ -61,20 +61,6 @@ public class GameWindow : Form
             return;
         }
 
-        if (e.KeyCode == Keys.B)
-        {
-            session.StartTestBattle();
-            Invalidate();
-            return;
-        }
-
-        if (e.KeyCode == Keys.V)
-        {
-            session.TriggerExplorationEvent();
-            Invalidate();
-            return;
-        }
-
         if (e.KeyCode == Keys.E)
         {
             session.Interact();
