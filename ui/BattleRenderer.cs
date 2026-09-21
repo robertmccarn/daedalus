@@ -117,6 +117,8 @@ public class BattleRenderer : IDisposable
 
             g.DrawString(enemy.Name, smallFont, Brushes.White, x - 12, y + 54);
             g.DrawString($"HP {enemy.HP}/{enemy.MAXHP}", microFont, Brushes.Gainsboro, x - 12, y + 68);
+            if (enemy.HP > 0 && battle.HasStatus(enemy, "Poisoned"))
+                g.DrawString("POISON", microFont, new SolidBrush(p.Hazard), x - 12, y + 81);
             index++;
         }
     }
@@ -190,10 +192,11 @@ public class BattleRenderer : IDisposable
         g.DrawRectangle(border, 835, 95, 240, 110);
 
         g.DrawString("TURN", smallFont, Brushes.White, 850, 110);
+        using Brush activeBrush = new SolidBrush(p.Accent);
         g.DrawString(
             battle.SelectedActor == null ? "NO ACTIVE PARTY MEMBER" : $"ACTIVE  {battle.SelectedActor.Name}",
             microFont,
-            new SolidBrush(p.Accent),
+            activeBrush,
             850,
             132);
 
@@ -247,7 +250,8 @@ public class BattleRenderer : IDisposable
         using Pen border = new(p.WallHighlight, 1);
         g.DrawRectangle(border, 395, 500, 415, 155);
 
-        g.DrawString("ACTION", smallFont, new SolidBrush(p.Accent), 415, 515);
+        using Brush actionBrush = new SolidBrush(p.Accent);
+        g.DrawString("ACTION", smallFont, actionBrush, 415, 515);
         g.DrawString(
             battle.CommandMessage,
             microFont,
