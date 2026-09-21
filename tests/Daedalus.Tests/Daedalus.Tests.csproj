@@ -7,8 +7,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <BaseIntermediateOutputPath>obj\tests\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\tests\</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
