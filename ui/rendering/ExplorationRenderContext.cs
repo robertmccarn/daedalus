@@ -7,6 +7,7 @@ public sealed class ExplorationRenderContext
     public ExpeditionState Expedition { get; }
     public PartyController Party { get; }
     public Func<int, int, bool> IsDiscovered { get; }
+    public Func<int, int, bool> IsVisible { get; }
     public string CurrentObjective { get; }
     public string Message { get; }
     public int CameraX { get; }
@@ -20,6 +21,7 @@ public sealed class ExplorationRenderContext
         PartyController party,
         ExpeditionState expedition,
         Func<int, int, bool> isCellDiscovered,
+        Func<int, int, bool> isCellVisible,
         string currentObjective,
         string message)
     {
@@ -27,6 +29,7 @@ public sealed class ExplorationRenderContext
         Party = party;
         Expedition = expedition;
         IsDiscovered = isCellDiscovered;
+        IsVisible = isCellVisible;
         CurrentObjective = currentObjective;
         Message = message;
 
