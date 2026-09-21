@@ -96,13 +96,11 @@ public sealed class WorldRenderer
 
     private static void DrawFloor(Graphics g, Rectangle r, WorldPresentationProfile p, int x, int y)
     {
-        // Keep the logical tile grid, but remove the alternating checkerboard read.
-        // Subtle deterministic slab variation gives the floor an authored-stone feel.
         int pattern = PositiveMod(x * 92821 + y * 68917, 31);
         float tone = pattern switch
         {
             3 or 17 => 0.16f,
-            8 or 24 => 0.08f,
+            8 or 24 => 0.09f,
             12 => 0.22f,
             _ => 0.03f
         };
@@ -111,27 +109,75 @@ public sealed class WorldRenderer
         using Brush fill = new SolidBrush(baseColor);
         g.FillRectangle(fill, r);
 
-        using Brush inset = new SolidBrush(Blend(baseColor, p.Void, 0.22f));
-        g.FillRectangle(inset, r.X + 2, r.Y + 2, r.Width - 4, r.Height - 4);
+        // Each floor cell is treated as a worn stone slab rather than a square tile.
+        int chip = PositiveMod(x * 17 + y * 43, 4);
+        int inset = 2;
+        Point[] slab =
+        {
+            new(r.X + inset + (chip == 0 ? 2 : 0), r.Y + inset),
+            new(r.Right - inset - 1, r.Y + inset + (chip == 1 ? 1 : 0)),
+            new(r.Right - inset - 2, r.Bottom - inset - (chip == 2 ? 2 : 0)),
+            new(r.X + inset + (chip == 3 ? 1 : 0), r.Bottom - inset - 1)
+        };
 
-        int slab = PositiveMod(x * 41 + y * 17, 5);
-        using Pen seam = new(Color.FromArgb(52, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
+        using Brush slabBrush = new SolidBrush(Blend(baseColor, p.Void, 0.15f));
+        g.FillPolygon(slabBrush, slab);
 
-        if (slab is 0 or 3)
-            g.DrawLine(seam, r.X + 3, r.Y + 8 + slab, r.Right - 4, r.Y + 6 + slab);
+        using Pen perimeter = new(
+            Color.FromArgb(62, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B),
+            1);
+        g.DrawPolygon(perimeter, slab);
 
-        if (slab is 1 or 4)
-            g.DrawLine(seam, r.X + 7 + slab, r.Y + 3, r.X + 8, r.Bottom - 4);
+        // Broken seams are intentionally short and offset so the eye does not
+        // assemble the scene into a regular checkerboard.
+        int seam = PositiveMod(x * 41 + y * 17, 7);
+        using Pen joint = new(
+            Color.FromArgb(68, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B),
+            1);
+
+        if (seam is 0 or 3)
+        {
+            int yy = r.Y + 8 + PositiveMod(y + x, 5);
+            g.DrawLine(joint, r.X + 4, yy, r.X + 17, yy - 1);
+        }
+
+        if (seam is 1 or 4)
+        {
+            int xx = r.X + 8 + PositiveMod(x * 3 + y, 8);
+            g.DrawLine(joint, xx, r.Y + 4, xx - 1, r.Y + 18);
+        }
+
+        if (seam is 2 or 6)
+        {
+            g.DrawLine(joint, r.X + 14, r.Y + 5, r.X + 20, r.Y + 9);
+            g.DrawLine(joint, r.X + 20, r.Y + 9, r.X + 23, r.Y + 16);
+        }
 
         if (pattern % 7 == 0)
         {
-            using Pen fracture = new(Color.FromArgb(42, p.Void.R, p.Void.G, p.Void.B), 1);
+            using Pen fracture = new(Color.FromArgb(95, p.Void.R, p.Void.G, p.Void.B), 1);
             g.DrawLine(fracture, r.X + 5, r.Y + 15, r.X + 11, r.Y + 19);
             g.DrawLine(fracture, r.X + 11, r.Y + 19, r.X + 16, r.Y + 14);
+            g.DrawLine(fracture, r.X + 16, r.Y + 14, r.X + 21, r.Y + 16);
         }
 
-        using Pen topEdge = new(Color.FromArgb(72, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
-        g.DrawLine(topEdge, r.X + 1, r.Y + 1, r.Right - 1, r.Y + 1);
+        if (pattern % 9 == 0)
+        {
+            using Brush chipBrush = new SolidBrush(Color.FromArgb(75, p.Void.R, p.Void.G, p.Void.B));
+            g.FillPolygon(
+                chipBrush,
+                new Point[]
+                {
+                    new(r.X + 2, r.Y + 2),
+                    new(r.X + 7, r.Y + 2),
+                    new(r.X + 5, r.Y + 6)
+                });
+        }
+
+        using Pen topEdge = new(
+            Color.FromArgb(46, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B),
+            1);
+        g.DrawLine(topEdge, r.X + 2, r.Y + 2, r.Right - 3, r.Y + 2);
     }
 
     private static void DrawWall(
@@ -142,44 +188,88 @@ public sealed class WorldRenderer
         int y,
         bool pillar)
     {
-        int extrusion = pillar ? 10 : 7;
+        int extrusion = pillar ? 13 : 9;
 
-        using Brush shadow = new SolidBrush(Color.FromArgb(90, 0, 0, 0));
-        g.FillRectangle(shadow, r.X + 3, r.Bottom - 1, r.Width - 1, extrusion);
+        using Brush shadow = new SolidBrush(Color.FromArgb(105, 0, 0, 0));
+        g.FillPolygon(
+            shadow,
+            new Point[]
+            {
+                new(r.X + 2, r.Bottom - 2),
+                new(r.Right - 2, r.Bottom - 2),
+                new(r.Right - 1, r.Bottom - 2 + extrusion),
+                new(r.X + 5, r.Bottom - 2 + extrusion)
+            });
 
-        Color bodyColor = Blend(p.Wall, p.Void, pillar ? 0.06f : 0.10f);
+        Color bodyColor = Blend(p.Wall, p.Void, pillar ? 0.04f : 0.09f);
         using Brush body = new SolidBrush(bodyColor);
         g.FillRectangle(body, r);
 
+        // Raised masonry top plane.
         Point[] topPlane =
         {
-            new Point(r.X + 1, r.Y + 2),
-            new Point(r.Right - 2, r.Y + 2),
-            new Point(r.Right - 5, r.Y + 7),
-            new Point(r.X + 4, r.Y + 7)
+            new(r.X + 1, r.Y + 2),
+            new(r.Right - 3, r.Y + 1),
+            new(r.Right - 6, r.Y + 7),
+            new(r.X + 4, r.Y + 8)
         };
-        using Brush top = new SolidBrush(Blend(p.WallHighlight, p.Wall, 0.55f));
+        using Brush top = new SolidBrush(Blend(p.WallHighlight, p.Wall, 0.48f));
         g.FillPolygon(top, topPlane);
 
-        using Brush face = new SolidBrush(Blend(p.Wall, p.Void, 0.30f));
-        g.FillRectangle(face, r.X + 2, r.Bottom - 7, r.Width - 3, 7);
+        // Dark lower face and side plane create physical thickness.
+        Point[] lowerFace =
+        {
+            new(r.X + 2, r.Bottom - 9),
+            new(r.Right - 3, r.Bottom - 9),
+            new(r.Right - 3, r.Bottom - 1),
+            new(r.X + 2, r.Bottom - 1)
+        };
+        using Brush face = new SolidBrush(Blend(p.Wall, p.Void, 0.34f));
+        g.FillPolygon(face, lowerFace);
 
-        using Pen edge = new(Color.FromArgb(175, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
-        g.DrawLine(edge, r.X + 1, r.Y + 2, r.Right - 2, r.Y + 2);
-        g.DrawLine(edge, r.X + 2, r.Bottom - 7, r.Right - 2, r.Bottom - 7);
+        Point[] sidePlane =
+        {
+            new(r.Right - 7, r.Y + 7),
+            new(r.Right - 3, r.Y + 1),
+            new(r.Right - 3, r.Bottom - 2),
+            new(r.Right - 7, r.Bottom - 8)
+        };
+        using Brush side = new SolidBrush(Blend(p.Wall, p.Void, 0.47f));
+        g.FillPolygon(side, sidePlane);
 
-        int seam = PositiveMod(x * 19 + y * 7, 5);
-        using Pen masonry = new(Color.FromArgb(42, p.Void.R, p.Void.G, p.Void.B), 1);
+        using Pen edge = new(
+            Color.FromArgb(190, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B),
+            1);
+        g.DrawLine(edge, r.X + 2, r.Y + 2, r.Right - 4, r.Y + 1);
+        g.DrawLine(edge, r.X + 2, r.Bottom - 9, r.Right - 4, r.Bottom - 9);
+
+        int seam = PositiveMod(x * 19 + y * 7, 6);
+        using Pen masonry = new(Color.FromArgb(54, p.Void.R, p.Void.G, p.Void.B), 1);
         if (seam is 0 or 2)
-            g.DrawLine(masonry, r.X + 4, r.Y + 12, r.Right - 4, r.Y + 11);
-        if (seam == 4)
-            g.DrawLine(masonry, r.X + 8, r.Y + 5, r.X + 7, r.Bottom - 9);
+            g.DrawLine(masonry, r.X + 4, r.Y + 13, r.X + 14, r.Y + 12);
+        if (seam is 1 or 4)
+            g.DrawLine(masonry, r.X + 14, r.Y + 7, r.X + 24, r.Y + 8);
+        if (seam == 5)
+            g.DrawLine(masonry, r.X + 8, r.Y + 6, r.X + 7, r.Bottom - 10);
 
         if (PositiveMod(x * 13 + y * 29, 6) is 1 or 5)
         {
-            using Pen crack = new(Color.FromArgb(82, p.Void.R, p.Void.G, p.Void.B), 1);
+            using Pen crack = new(Color.FromArgb(92, p.Void.R, p.Void.G, p.Void.B), 1);
             g.DrawLine(crack, r.X + 7, r.Y + 10, r.X + 11, r.Y + 17);
             g.DrawLine(crack, r.X + 11, r.Y + 17, r.X + 8, r.Y + 23);
+        }
+
+        if (PositiveMod(x * 31 + y * 11, 9) == 0)
+        {
+            using Brush chipBrush = new SolidBrush(Color.FromArgb(90, p.Void.R, p.Void.G, p.Void.B));
+            g.FillPolygon(
+                chipBrush,
+                new Point[]
+                {
+                    new(r.Right - 11, r.Y + 3),
+                    new(r.Right - 4, r.Y + 2),
+                    new(r.Right - 6, r.Y + 10)
+                });
         }
     }
 
