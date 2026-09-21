@@ -12,9 +12,7 @@ public class ExplorationRenderer : IDisposable
     private readonly EffectRenderer effectRenderer = new();
     private readonly ExplorationHudRenderer hudRenderer = new();
 
-    public ExplorationRenderer(GameWorld world)
-    {
-    }
+    public ExplorationRenderer(GameWorld world) { }
 
     public void Draw(
         Graphics graphics,
@@ -27,13 +25,8 @@ public class ExplorationRenderer : IDisposable
         string message)
     {
         ExplorationRenderContext context = new(
-            world,
-            party,
-            expedition,
-            isCellDiscovered,
-            isCellVisible,
-            currentObjective,
-            message);
+            world, party, expedition, isCellDiscovered, isCellVisible,
+            currentObjective, message);
 
         List<RenderItem> renderItems =
         new()
@@ -52,9 +45,7 @@ public class ExplorationRenderer : IDisposable
                      .OrderBy(item => item.Pass)
                      .ThenBy(item => item.Depth)
                      .ThenBy(item => item.StableOrder))
-        {
             item.Draw(graphics);
-        }
     }
 
     public void Dispose() => hudRenderer.Dispose();
