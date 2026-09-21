@@ -235,7 +235,7 @@ public sealed class BattleSystem
 
             if (enemy == null)
                 continue;
-        {
+
             PartyMember? target = LivingParty()
                 .OrderBy(member => member.HP)
                 .ThenBy(member => member.Id, StringComparer.Ordinal)
@@ -256,6 +256,9 @@ public sealed class BattleSystem
 
         if (statusDamage > 0)
             CommandMessage += $" Poison deals {statusDamage} damage.";
+
+        foreach (string actorId in defendingActors)
+            ClearStatus(actorId, "Guarded");
 
         defendingActors.Clear();
         return totalDamage + statusDamage;
