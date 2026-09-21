@@ -9,13 +9,30 @@ public sealed class ExtractionResultsRenderer : IDisposable
 
     public void Draw(Graphics g, ExtractionSummary? summary, string message)
     {
+        long now = AnimationClock.Now;
         g.Clear(Color.FromArgb(7, 10, 12));
 
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 1800);
         using Brush panel = new SolidBrush(Color.FromArgb(232, 14, 18, 22));
         g.FillRectangle(panel, 90, 70, 920, 520);
 
-        using Pen border = new(Color.FromArgb(180, 117, 159, 155), 1);
+        using Pen border = new(
+            Color.FromArgb(155 + (int)(50 * pulse), 117, 159, 155),
+            1);
         g.DrawRectangle(border, 90, 70, 920, 520);
+
+        for (int i = 0; i < 12; i++)
+        {
+            float phase = AnimationClock.Phase(now, 3600 + i * 120, i * 71);
+            float x = 120 + i * 70 + MathF.Sin(phase * MathF.PI * 2f) * 8f;
+            float y = 90 + (0.5f + 0.5f * MathF.Cos(phase * MathF.PI * 2f)) * 460f;
+            using Brush mote = new SolidBrush(Color.FromArgb(
+                18 + (int)(28 * pulse),
+                117,
+                159,
+                155));
+            g.FillEllipse(mote, x, y, 2, 2);
+        }
 
         g.DrawString("EXPEDITION EXTRACTED", title, Brushes.White, 125, 105);
         g.DrawString("RECOVERED MATERIAL", small, Brushes.Gainsboro, 128, 150);
@@ -36,7 +53,8 @@ public sealed class ExtractionResultsRenderer : IDisposable
             g.DrawString($"RUNS COMPLETED    {summary.CampaignRunsAfter}", body, Brushes.White, 128, 465);
         }
 
-        using Brush accent = new SolidBrush(Color.FromArgb(220, 125, 180, 177));
+        int accentAlpha = 175 + (int)(70 * pulse);
+        using Brush accent = new SolidBrush(Color.FromArgb(accentAlpha, 125, 180, 177));
         g.DrawString("ENTER  RETURN TO CAMP", section, accent, 128, 535);
     }
 
