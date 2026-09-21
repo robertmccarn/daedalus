@@ -24,7 +24,7 @@ public sealed class PartyController
         ExpeditionState expedition,
         GridPosition leaderPosition,
         string? leaderId = null,
-        PartyFormationType formation = PartyFormationType.Column)
+        PartyFormationType? formation = null)
     {
         members.Clear();
         history.Clear();
@@ -40,7 +40,7 @@ public sealed class PartyController
             LeaderId = expedition.Party[0].Id;
         }
 
-        Formation = formation;
+        Formation = formation ?? expedition.Formation;
         if (!world.IsWalkable(leaderPosition.X, leaderPosition.Y))
             leaderPosition = new GridPosition(world.SpawnX, world.SpawnY);
 
