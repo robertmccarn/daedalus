@@ -130,40 +130,101 @@ public sealed class RuinFeatureRenderer
         int height = Math.Max(18, feature.Height * context.TileSize - 5);
         int lift = feature.Elevation * 4;
 
-        using Brush underShadow = new SolidBrush(Color.FromArgb(135, 0, 0, 0));
-        g.FillRectangle(underShadow, origin.X + 5, origin.Y + height + 3, width - 2, 13);
+        // Supports disappear into the abyss. Their silhouettes sell the bridge
+        // as a structure rather than a painted rectangle.
+        using Brush support = new SolidBrush(Color.FromArgb(135, 17, 18, 19));
+        int supportCount = Math.Max(2, Math.Min(4, feature.Width / 2));
+        for (int i = 0; i < supportCount; i++)
+        {
+            int sx = origin.X + 12 + i * Math.Max(20, (width - 30) / Math.Max(1, supportCount - 1));
+            int top = origin.Y + height - 2 - lift;
+            Point[] pier =
+            {
+                new(sx - 5, top),
+                new(sx + 5, top),
+                new(sx + 9, top + 42),
+                new(sx + 1, top + 64),
+                new(sx - 7, top + 42)
+            };
+            g.FillPolygon(support, pier);
+        }
+
+        using Brush underShadow = new SolidBrush(Color.FromArgb(170, 0, 0, 0));
+        g.FillPolygon(
+            underShadow,
+            new Point[]
+            {
+                new(origin.X + 4, origin.Y + height + 3 - lift),
+                new(origin.X + width - 7, origin.Y + height - 1 - lift),
+                new(origin.X + width - 1, origin.Y + height + 9 - lift),
+                new(origin.X + 6, origin.Y + height + 15 - lift)
+            });
 
         Point[] deck =
         {
-            new(origin.X + 2, origin.Y + 7 - lift),
-            new(origin.X + width - 5, origin.Y + 3 - lift),
-            new(origin.X + width - 5, origin.Y + height - 2 - lift),
-            new(origin.X + 2, origin.Y + height + 2 - lift)
+            new(origin.X + 2, origin.Y + 8 - lift),
+            new(origin.X + width - 7, origin.Y + 3 - lift),
+            new(origin.X + width - 4, origin.Y + height - 5 - lift),
+            new(origin.X + 8, origin.Y + height + 2 - lift)
         };
 
-        using Brush bridge = new SolidBrush(Color.FromArgb(122, 105, 82));
+        using Brush bridge = new SolidBrush(Color.FromArgb(116, 99, 79));
         g.FillPolygon(bridge, deck);
 
-        using Brush wornTop = new SolidBrush(Color.FromArgb(148, 127, 98));
-        g.FillPolygon(wornTop, new Point[]
+        Point[] frontFace =
         {
-            new(origin.X + 3, origin.Y + 8 - lift),
-            new(origin.X + width - 7, origin.Y + 4 - lift),
-            new(origin.X + width - 7, origin.Y + 11 - lift),
-            new(origin.X + 3, origin.Y + 15 - lift)
-        });
+            new(origin.X + 8, origin.Y + height - 3 - lift),
+            new(origin.X + width - 4, origin.Y + height - 7 - lift),
+            new(origin.X + width - 5, origin.Y + height + 2 - lift),
+            new(origin.X + 8, origin.Y + height + 8 - lift)
+        };
+        using Brush face = new SolidBrush(Color.FromArgb(73, 64, 53));
+        g.FillPolygon(face, frontFace);
 
-        using Pen edge = new(Color.FromArgb(215, 80, 72, 60), 2);
+        using Brush wornTop = new SolidBrush(Color.FromArgb(151, 128, 99));
+        g.FillPolygon(
+            wornTop,
+            new Point[]
+            {
+                new(origin.X + 4, origin.Y + 9 - lift),
+                new(origin.X + width - 9, origin.Y + 5 - lift),
+                new(origin.X + width - 11, origin.Y + 11 - lift),
+                new(origin.X + 6, origin.Y + 16 - lift)
+            });
+
+        using Pen edge = new(Color.FromArgb(215, 88, 78, 64), 2);
         g.DrawPolygon(edge, deck);
 
-        using Pen seams = new(Color.FromArgb(105, 48, 43, 36), 1);
-        for (int x = origin.X + 12; x < origin.X + width - 7; x += 18)
-            g.DrawLine(seams, x, origin.Y + 7 - lift, x - 1, origin.Y + height - 2 - lift);
+        using Pen seams = new(Color.FromArgb(105, 44, 40, 34), 1);
+        for (int x = origin.X + 16; x < origin.X + width - 10; x += 18)
+        {
+            g.DrawLine(
+                seams,
+                x,
+                origin.Y + 7 - lift,
+                x - 2,
+                origin.Y + height - 5 - lift);
+        }
 
-        using Brush rail = new SolidBrush(Color.FromArgb(145, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B));
-        g.FillRectangle(rail, origin.X + 6, origin.Y + 4 - lift, width - 10, 3);
-        g.FillRectangle(rail, origin.X + 8, origin.Y + 5 - lift, 3, height - 4);
-        g.FillRectangle(rail, origin.X + width - 12, origin.Y + 1 - lift, 3, height - 1);
+        // One broken edge gives the bridge a story and a strong silhouette.
+        if (feature.Variant % 2 == 0 && width > 48)
+        {
+            using Brush voidBrush = new SolidBrush(p.Void);
+            g.FillPolygon(
+                voidBrush,
+                new Point[]
+                {
+                    new(origin.X + width - 22, origin.Y + 4 - lift),
+                    new(origin.X + width - 5, origin.Y + 3 - lift),
+                    new(origin.X + width - 9, origin.Y + 20 - lift),
+                    new(origin.X + width - 20, origin.Y + 15 - lift)
+                });
+        }
+
+        using Brush rail = new SolidBrush(Color.FromArgb(150, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B));
+        g.FillRectangle(rail, origin.X + 7, origin.Y + 4 - lift, width - 15, 3);
+        g.FillRectangle(rail, origin.X + 8, origin.Y + 5 - lift, 3, height - 7);
+        g.FillRectangle(rail, origin.X + width - 13, origin.Y + 1 - lift, 3, height - 4);
     }
 
     private static void DrawPillar(
