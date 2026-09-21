@@ -133,6 +133,22 @@ public sealed class BattleSystem
         State.Description = CommandMessage;
     }
 
+    public void SelectPreviousTarget()
+    {
+        if (IsFinished || !IsCurrentPartyActor)
+            return;
+
+        List<Character> living = LivingEnemies();
+        if (living.Count == 0)
+            return;
+
+        int current = living.FindIndex(enemy => GetEnemyId(enemy) == State.SelectedTargetId);
+        int previous = current <= 0 ? living.Count - 1 : current - 1;
+        State.SelectedTargetId = GetEnemyId(living[previous]);
+        CommandMessage = $"Target: {living[previous].Name}.";
+        State.Description = CommandMessage;
+    }
+
     public BattleResult PerformPlayerTurn(out int playerDamage, out int enemyDamage)
     {
         playerDamage = 0;
