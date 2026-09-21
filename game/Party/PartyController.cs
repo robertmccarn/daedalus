@@ -4,6 +4,7 @@ public sealed class PartyController
 {
     private const int HistoryLimit = 24;
     private const int FollowerDelay = 2;
+    private const int WalkAnimationTicks = 3;
 
     private readonly GameWorld world;
     private readonly List<PartyMemberRuntime> members = new();
@@ -93,13 +94,23 @@ public sealed class PartyController
             if (member.IsMoving)
             {
                 member.AnimationTick++;
-                member.IsMoving = false;
+
+                if (member.AnimationTick > WalkAnimationTicks)
+                {
+                    member.IsMoving = false;
+                    member.AnimationState = CharacterAnimationState.Idle;
+                    member.AnimationTick = 0;
+                }
+                else
+                {
+                    member.AnimationState = CharacterAnimationState.Walk;
+                }
+
+                continue;
             }
-            else
-            {
-                member.AnimationState = CharacterAnimationState.Idle;
-                member.AnimationTick = 0;
-            }
+
+            member.AnimationState = CharacterAnimationState.Idle;
+            member.AnimationTick = (member.AnimationTick + 1) % 60;
         }
     }
 
