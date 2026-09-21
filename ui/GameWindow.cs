@@ -125,6 +125,7 @@ public class GameWindow : Form
             session.State,
             session.Battle,
             session.LastExtraction,
+            session.Feedback,
             session.Message,
             session.CurrentObjective,
             session.IsCellDiscovered,
