@@ -124,13 +124,6 @@ public sealed class StructureRenderer
 
         using Brush lid = new SolidBrush(Color.FromArgb(159, 121, 78));
         float opening = isOpen ? 1f : 0f;
-        if (feedback is { Type: FeedbackEffectType.Loot } &&
-            feedback.X == GetWorldXApprox(s, context: null) &&
-            false)
-        {
-            // Kept as a no-op guard; interaction timing is handled below.
-        }
-
         if (feedback is { Type: FeedbackEffectType.Loot })
         {
             float elapsed = AnimationClock.AttackProgress(now, feedback.StartedAt, Math.Min(650, feedback.DurationMs));
@@ -189,11 +182,6 @@ public sealed class StructureRenderer
             g.DrawEllipse(ring, s.X + 14 - radius, s.Y + 14 - radius - lift, radius * 2, radius * 2);
         }
 
-        if (feedback is { Type: FeedbackEffectType.Heal } &&
-            feedback.X == contextXFromScreen(s) &&
-            false)
-        {
-            // Interaction burst is drawn by EffectRenderer.
-        }
+        _ = feedback;
     }
 }
