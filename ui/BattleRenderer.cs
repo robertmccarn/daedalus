@@ -164,7 +164,8 @@ public class BattleRenderer : IDisposable
                 battle.SelectedTarget == enemy,
                 alpha,
                 hit,
-                now);
+                now,
+                battle);
 
             index++;
         }
@@ -186,7 +187,8 @@ public class BattleRenderer : IDisposable
         string id,
         float alpha,
         bool hit,
-        long now)
+        long now,
+        BattleSystem battle)
     {
         using Brush shadow = new SolidBrush(Color.FromArgb((int)(100 * alpha), 0, 0, 0));
         g.FillEllipse(shadow, x - 3, y + 46, 58, 13);
@@ -400,7 +402,7 @@ public class BattleRenderer : IDisposable
         return t >= 0.42f && t <= 0.72f;
     }
 
-    private static void DrawBattleEffect(
+    private void DrawBattleEffect(
         Graphics g,
         WorldPresentationProfile p,
         BattleSystem battle,
@@ -553,7 +555,7 @@ public class BattleRenderer : IDisposable
         }
     }
 
-    private static void DrawTurnOrder(
+    private void DrawTurnOrder(
         Graphics g,
         WorldPresentationProfile p,
         BattleSystem battle,
