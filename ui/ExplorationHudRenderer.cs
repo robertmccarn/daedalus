@@ -3,58 +3,85 @@ using Systemic.Engine.State;
 
 public class ExplorationHudRenderer : IDisposable
 {
-    private readonly Font uiFont = new(FontFamily.GenericMonospace, 14);
-    private readonly Font titleFont = new(FontFamily.GenericMonospace, 20);
-    private readonly Font bottomFont = new(FontFamily.GenericMonospace, 14);
+    private readonly Font uiFont = new(FontFamily.GenericMonospace, 12);
+    private readonly Font titleFont = new(FontFamily.GenericMonospace, 18, FontStyle.Bold);
+    private readonly Font smallFont = new(FontFamily.GenericMonospace, 10);
+    private readonly MinimapRenderer minimap = new();
 
-    public void Draw(Graphics graphics, PartyController party, ExpeditionState expedition)
+    public void Draw(Graphics graphics, ExplorationRenderContext context)
     {
-        const int sidebarX = 780;
-        graphics.DrawLine(Pens.White, sidebarX, 20, sidebarX, 620);
-        float x = sidebarX + 25;
-        float y = 30;
-        graphics.DrawString("PARTY", titleFont, Brushes.White, x, y);
+        WorldPresentationProfile p = context.Profile;
 
-        PartyMember? leader = expedition.Party
-            .FirstOrDefault(member => member.Id == party.LeaderId);
+        using Brush panel = new SolidBrush(Color.FromArgb(232, 12, 15, 18));
+        graphics.FillRectangle(panel, 860, 0, 240, 700);
+        using Pen border = new(Color.FromArgb(180, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
+        graphics.DrawLine(border, 860, 0, 860, 700);
 
-        if (leader == null)
-            return;
+        graphics.DrawString("DAEDALUS", titleFont, new SolidBrush(p.Bone()), 882, 18);
+        graphics.DrawString(BiomeCatalog.Name(context.Biome), smallFont, new SolidBrush(p.Accent), 882, 47);
+        graphics.DrawString($"DEPTH {context.World.Floor:00}", uiFont, Brushes.White, 882, 64);
 
-        graphics.FillRectangle(Brushes.DarkSlateBlue, x, y + 35, 120, 120);
-        graphics.DrawRectangle(Pens.White, x, y + 35, 120, 120);
-        graphics.DrawString(leader.Name, uiFont, Brushes.White, x + 12, y + 85);
+        minimap.Draw(graphics, context, new Rectangle(882, 92, 195, 135));
 
-        y += 165;
-        graphics.DrawString(leader.Name, titleFont, Brushes.Red, x, y);
-        y += 35;
-        graphics.DrawString($"LV {leader.Level}", uiFont, Brushes.White, x, y);
-        y += 30;
-        graphics.DrawString($"HP {leader.HP}/{leader.MaxHP}", uiFont, Brushes.White, x, y);
-        y += 30;
-        graphics.DrawString($"MORALE {leader.Morale}", uiFont, Brushes.White, x, y);
-        y += 40;
-        graphics.DrawLine(Pens.White, x, y, x + 220, y);
-        y += 25;
-        GridPosition position = party.LeaderPosition;
-        graphics.DrawString($"Position: ({position.X}, {position.Y})", uiFont, Brushes.White, x, y);
-        y += 30;
-        graphics.DrawString($"Party: {expedition.Party.Count}/4", uiFont, Brushes.White, x, y);
-        y += 30;
-        graphics.DrawString($"Formation: {expedition.Formation}", uiFont, Brushes.White, x, y);
+        PartyMember? leader = context.Expedition.Party
+            .FirstOrDefault(member => member.Id == context.Party.LeaderId);
 
-        const int bottomY = 640;
-        graphics.DrawLine(Pens.White, 20, bottomY, 1080, bottomY);
-        graphics.DrawString("W/A/S/D  MOVE", bottomFont, Brushes.White, 30, bottomY + 15);
-        graphics.DrawString("C  STATS", bottomFont, Brushes.White, 260, bottomY + 15);
-        graphics.DrawString("B  TEST BATTLE", bottomFont, Brushes.White, 430, bottomY + 15);
-        graphics.DrawString("E  INTERACT", bottomFont, Brushes.White, 650, bottomY + 15);
+        if (leader != null)
+        {
+            graphics.DrawString("EXPEDITION", titleFont, Brushes.White, 882, 244);
+            int y = 276;
+            foreach (PartyMember member in context.Expedition.Party.Take(4))
+            {
+                bool selected = member.Id == context.Party.LeaderId;
+                Color accent = selected ? p.Accent : Color.FromArgb(180, 220, 220, 220);
+                using Brush accentBrush = new SolidBrush(accent);
+                graphics.FillRectangle(accentBrush, 882, y + 3, 5, 31);
+                graphics.DrawString(member.Name, uiFont, Brushes.White, 895, y);
+                graphics.DrawString($"HP {member.HP,2}/{member.MaxHP,2}  M {member.Morale,3}", smallFont, Brushes.Gainsboro, 895, y + 17);
+                y += 40;
+            }
+
+            graphics.DrawString($"FORMATION  {context.Expedition.Formation.ToString().ToUpperInvariant()}", smallFont, Brushes.Gainsboro, 882, 448);
+            graphics.DrawString($"UPKEEP     {context.Expedition.Upkeep}", smallFont, Brushes.Gainsboro, 882, 466);
+            graphics.DrawString($"LOOT GOLD  {context.Expedition.CarriedGold}", smallFont, Brushes.Gainsboro, 882, 484);
+        }
+
+        DungeonNode? node = context.World.GetNodeAt(
+            context.Party.LeaderPosition.X,
+            context.Party.LeaderPosition.Y);
+
+        if (node != null)
+        {
+            using Brush prompt = new SolidBrush(Color.FromArgb(225, 24, 28, 32));
+            graphics.FillRectangle(prompt, 875, 520, 210, 48);
+            graphics.DrawRectangle(border, 875, 520, 210, 48);
+            graphics.DrawString($"[{PromptFor(node)}]", uiFont, Brushes.White, 886, 530);
+            graphics.DrawString(node.Name, smallFont, new SolidBrush(p.Accent), 886, 548);
+        }
+
+        graphics.DrawString("WASD MOVE   E INTERACT   X EXTRACT", smallFont, Brushes.Gainsboro, 875, 610);
+        graphics.DrawString("C STATS     B BATTLE", smallFont, Brushes.Gainsboro, 875, 628);
     }
+
+    private static string PromptFor(DungeonNode node) => node.Type switch
+    {
+        DungeonNodeType.Chest => "E OPEN",
+        DungeonNodeType.Terminal => "E ACTIVATE",
+        DungeonNodeType.Extraction => "X EXTRACT",
+        DungeonNodeType.Combat => "CONTACT",
+        _ => "E INSPECT"
+    };
 
     public void Dispose()
     {
         uiFont.Dispose();
         titleFont.Dispose();
-        bottomFont.Dispose();
+        smallFont.Dispose();
     }
+}
+
+internal static class ColorExtensions
+{
+    public static Color Bone(this WorldPresentationProfile profile) =>
+        Color.FromArgb(238, 240, 244);
 }
