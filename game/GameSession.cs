@@ -33,6 +33,7 @@ public class GameSession
         SyncCompatibilityPlayer();
         SynchronizeExpedition();
         RecordNodeVisit(World.SpawnX, World.SpawnY);
+        UpdateVisibility();
         ApplyGearBonuses();
     }
 
@@ -65,6 +66,7 @@ public class GameSession
             GridPosition position = Party.LeaderPosition;
             RecordNodeVisit(position.X, position.Y);
             SynchronizeExpedition();
+            UpdateVisibility();
 
             if (StateManager.ActiveExpedition.TurnCount % 12 == 0)
                 TriggerExplorationEvent();
@@ -80,18 +82,9 @@ public class GameSession
         return result;
     }
 
-    public void StartTestBattle()
-    {
-        if (State == GameState.Exploration &&
-            StateManager.ActiveExpedition.ExtractionState == "Active" &&
-            World.Enemies.Count > 0)
-            StartBattle(World.Enemies[0]);
-    }
-
     public void TriggerExplorationEvent()
     {
-        if (State != GameState.Exploration ||
-            StateManager.ActiveExpedition.ExtractionState != "Active")
+        if (State != GameState.Exploration || StateManager.ActiveExpedition.ExtractionState != "Active")
             return;
 
         ExpeditionEvent expeditionEvent = EventSystem.Roll(
@@ -163,6 +156,7 @@ public class GameSession
 
     public void SelectPreviousBattleCommand() => Battle?.SelectPreviousCommand();
     public void SelectNextBattleCommand() => Battle?.SelectNextCommand();
+    public void SelectNextBattleTarget() => Battle?.SelectNextTarget();
 
     public void CancelBattle()
     {
@@ -173,36 +167,46 @@ public class GameSession
     {
         if (Battle == null || State != GameState.Battle) return;
 
-        BattleResult result = Battle.PerformPlayerTurn(out _, out int enemyDamage);
+        BattleResult result = Battle.PerformPlayerTurn(out int playerDamage, out int enemyDamage);
         SynchronizeExpedition();
         Message = Battle.CommandMessage;
 
         if (result == BattleResult.EnemyDefeated)
         {
-            Character defeatedEnemy = Battle.Enemy;
-            RewardBundle reward = ExpeditionRewardSystem.CreateCombatReward(defeatedEnemy, World.Floor);
-            PartyMember? partyMember = StateManager.ActiveExpedition.Party.FirstOrDefault(member => member.Id == Party.LeaderId);
+            IReadOnlyList<Character> defeatedEnemies = Battle.DefeatedEnemies.ToArray();
 
-            if (partyMember != null)
+            foreach (Character defeatedEnemy in defeatedEnemies)
             {
-                bool leveled = ExpeditionRewardSystem.ApplyCombatReward(
-                    StateManager.Campaign, StateManager.ActiveExpedition, partyMember, reward);
+                RewardBundle reward = ExpeditionRewardSystem.CreateCombatReward(defeatedEnemy, World.Floor);
                 MoraleSystem.ApplyEvent(StateManager.ActiveExpedition, MoraleEventType.EnemyDefeated);
-                if (leveled) Message += " Level up!";
+
+                foreach (PartyMember partyMember in StateManager.ActiveExpedition.Party.Where(member => member.HP > 0))
+                    ProgressionSystem.ApplyExperience(partyMember, reward.Experience);
+
+                ExtractionSystem.ApplyReward(
+                    StateManager.Campaign,
+                    StateManager.ActiveExpedition,
+                    reward);
+
+                World.BeginEnemyDeath(defeatedEnemy);
+                CompleteNode(defeatedEnemy.X, defeatedEnemy.Y);
             }
 
-            World.BeginEnemyDeath(defeatedEnemy);
-            CompleteNode(defeatedEnemy.X, defeatedEnemy.Y);
-            EndBattle();
+            int xp = defeatedEnemies.Sum(enemy => ExpeditionRewardSystem.CreateCombatReward(enemy, World.Floor).Experience);
+            int gold = defeatedEnemies.Sum(enemy => ExpeditionRewardSystem.CreateCombatReward(enemy, World.Floor).Gold);
+            int cores = defeatedEnemies.Sum(enemy => ExpeditionRewardSystem.CreateCombatReward(enemy, World.Floor).Cores.Sum(core => core.Quantity));
 
-            Message = $"Victory. +{reward.Experience} XP, +{reward.Gold} gold, +{reward.Cores.Sum(core => core.Quantity)} core, and drops recovered.";
+            EndBattle();
+            Message = $"Victory. +{xp} XP, +{gold} gold, +{cores} core(s), and drops recovered.";
             ApplyGearBonuses();
+            SynchronizeExpedition();
+            UpdateVisibility();
             return;
         }
 
         if (result == BattleResult.PlayerDefeated)
         {
-            Message = $"{Battle.Enemy.Name} attacks for {enemyDamage} damage. You were defeated.";
+            Message = Battle.CommandMessage;
             State = GameState.GameOver;
             StateManager.ActiveExpedition.ExtractionState = "Defeated";
             Party.GetLeaderRuntime().IsDefeated = true;
@@ -218,11 +222,15 @@ public class GameSession
         }
 
         if (enemyDamage > 0)
-            Message += $" {Battle.Enemy.Name} attacks for {enemyDamage} damage.";
+            Message = $"{Battle.CommandMessage} Enemy pressure: {enemyDamage} damage.";
+        _ = playerDamage;
     }
 
     public void DiscoverCell(int x, int y) => StateManager.DiscoverArea(x, y);
     public bool IsCellDiscovered(int x, int y) => StateManager.IsDiscovered(x, y);
+    public bool IsCellVisible(int x, int y) =>
+        VisibilitySystem.IsVisible(World, Party.LeaderPosition, new GridPosition(x, y));
+
     public bool Save(string path) => StateManager.Save(path);
 
     public bool Load(string path)
@@ -237,6 +245,7 @@ public class GameSession
         State = GameState.Exploration;
         Battle = null;
         Message = "Expedition loaded.";
+        UpdateVisibility();
         return true;
     }
 
@@ -255,8 +264,6 @@ public class GameSession
         int upkeep = StateManager.ActiveExpedition.Upkeep;
         if (!ExtractionSystem.Extract(StateManager)) return false;
 
-        State = GameState.Exploration;
-        Battle = null;
         Message = $"Expedition extracted at depth {StateManager.ActiveExpedition.CurrentFloor}. Upkeep settled: {upkeep}.";
         return true;
     }
@@ -279,9 +286,20 @@ public class GameSession
     {
         SyncCompatibilityPlayer();
         ApplyGearBonuses();
-        Battle = new BattleSystem(World.Player, enemy);
+
+        List<Character> battleEnemies = World.Enemies
+            .OrderBy(candidate => candidate == enemy ? 0 : 1)
+            .ThenBy(candidate => Math.Abs(candidate.X - enemy.X) + Math.Abs(candidate.Y - enemy.Y))
+            .ThenBy(candidate => candidate.Name, StringComparer.Ordinal)
+            .Take(3)
+            .ToList();
+
+        Battle = new BattleSystem(
+            StateManager.ActiveExpedition,
+            battleEnemies);
+
         State = GameState.Battle;
-        Message = string.Empty;
+        Message = Battle.CommandMessage;
     }
 
     private void EndBattle()
@@ -290,6 +308,7 @@ public class GameSession
         Battle = null;
         Message = string.Empty;
         SyncCompatibilityPlayer();
+        UpdateVisibility();
     }
 
     private void AdvanceToNextFloor()
@@ -304,6 +323,7 @@ public class GameSession
         RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
+        UpdateVisibility();
     }
 
     private void CompleteNode(int x, int y)
@@ -331,10 +351,25 @@ public class GameSession
     {
         PartyMember? leader = GetLeaderState();
         if (leader == null) return;
-        StateManager.SynchronizeExpedition(Party.LeaderPosition.X, Party.LeaderPosition.Y, World.Player.HP, World.Player.MAXHP);
+        StateManager.SynchronizeExpedition(
+            Party.LeaderPosition.X,
+            Party.LeaderPosition.Y,
+            World.Player.HP,
+            World.Player.MAXHP);
         leader.HP = World.Player.HP;
         leader.MaxHP = World.Player.MAXHP;
         leader.Level = World.Player.Level;
+    }
+
+    private void UpdateVisibility()
+    {
+        GridPosition leader = Party.LeaderPosition;
+        int radius = 7;
+
+        for (int y = Math.Max(0, leader.Y - radius); y <= Math.Min(GameWorld.Height - 1, leader.Y + radius); y++)
+        for (int x = Math.Max(0, leader.X - radius); x <= Math.Min(GameWorld.Width - 1, leader.X + radius); x++)
+            if (VisibilitySystem.IsVisible(World, leader, new GridPosition(x, y), radius))
+                StateManager.MarkDiscovered(x, y);
     }
 
     private void SyncCompatibilityPlayer()
