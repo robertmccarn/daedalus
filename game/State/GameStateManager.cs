@@ -56,18 +56,36 @@ public class GameStateManager
         StartNewExpedition(26, 5, 30, 30, selectedMemberIds: selected, leaderId: Campaign.PartyRoster.FirstOrDefault()?.Id);
     }
 
-    public void SynchronizeExpedition(int x, int y, int health, int maxHealth)
+    public void SynchronizeExpedition(
+        int x,
+        int y,
+        int health,
+        int maxHealth,
+        Func<int, int, bool>? isVisible = null)
     {
         ActiveExpedition.PlayerGridPosition = (x, y);
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
-        PartyMember? leader = ActiveExpedition.Party.FirstOrDefault(member => member.Id == ActiveExpedition.LeaderId);
+
+        PartyMember? leader = ActiveExpedition.Party
+            .FirstOrDefault(member => member.Id == ActiveExpedition.LeaderId);
+
         if (leader != null)
         {
             leader.HP = health;
             leader.MaxHP = maxHealth;
         }
-        DiscoverArea(x, y);
+
+        if (isVisible == null)
+        {
+            DiscoverArea(x, y);
+            return;
+        }
+
+        for (int yy = Math.Max(0, y - 7); yy <= Math.Min(GameWorld.Height - 1, y + 7); yy++)
+        for (int xx = Math.Max(0, x - 7); xx <= Math.Min(GameWorld.Width - 1, x + 7); xx++)
+            if (isVisible(xx, yy))
+                MarkDiscovered(xx, yy);
     }
 
     public void AdvanceFloor(int health, int maxHealth)
@@ -83,10 +101,23 @@ public class GameStateManager
         Campaign.HighestDepth = Math.Max(Campaign.HighestDepth, ActiveExpedition.CurrentFloor);
     }
 
-    public void SetExpeditionPosition(int x, int y)
+    public void SetExpeditionPosition(
+        int x,
+        int y,
+        Func<int, int, bool>? isVisible = null)
     {
         ActiveExpedition.PlayerGridPosition = (x, y);
-        DiscoverArea(x, y);
+
+        if (isVisible == null)
+        {
+            DiscoverArea(x, y);
+            return;
+        }
+
+        for (int yy = Math.Max(0, y - 7); yy <= Math.Min(GameWorld.Height - 1, y + 7); yy++)
+        for (int xx = Math.Max(0, x - 7); xx <= Math.Min(GameWorld.Width - 1, x + 7); xx++)
+            if (isVisible(xx, yy))
+                MarkDiscovered(xx, yy);
     }
 
     public void CommitExpeditionProgress()
