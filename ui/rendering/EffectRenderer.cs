@@ -13,7 +13,7 @@ public sealed class EffectRenderer
         DrawAmbientDust(g, context, p, now);
         DrawMist(g, context, p, now);
         DrawFeedback(g, context, p, now);
-        DrawVignette(g, p);
+        DrawVignette(g, context);
     }
 
     private static void DrawEnvironmentLights(
@@ -320,11 +320,12 @@ public sealed class EffectRenderer
         }
     }
 
-    private static void DrawVignette(Graphics g, WorldPresentationProfile p)
+    private static void DrawVignette(Graphics g, ExplorationRenderContext context)
     {
         // Vignette is scoped to the playable world, not the HUD.
         // The HUD remains crisp and unaffected by exploration atmosphere.
-        Rectangle viewport = ((ExplorationRenderContext?)g.Tag)?.Layout.WorldViewport ?? new Rectangle(0, 0, 860, 620);
+        WorldPresentationProfile p = context.Profile;
+        Rectangle viewport = context.Layout.WorldViewport;
         using Brush top = new SolidBrush(Color.FromArgb(55, p.Void.R, p.Void.G, p.Void.B));
         using Brush bottom = new SolidBrush(Color.FromArgb(80, p.Void.R, p.Void.G, p.Void.B));
         g.FillRectangle(top, viewport.X, viewport.Y, viewport.Width, Math.Min(34, viewport.Height));
