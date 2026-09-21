@@ -20,22 +20,15 @@ public class GameRenderer : IDisposable
         PartyController party,
         ExpeditionState expedition,
         GameState gameState,
-        Character? battleEnemy,
+        BattleSystem? battle,
         string message,
         string currentObjective,
-        BattleCommand selectedCommand,
-        Func<int, int, bool> isCellDiscovered)
+        Func<int, int, bool> isCellDiscovered,
+        Func<int, int, bool> isCellVisible)
     {
-        if (gameState == GameState.Battle)
+        if (gameState == GameState.Battle && battle != null)
         {
-            battleRenderer.Draw(
-                graphics,
-                world,
-                party,
-                expedition,
-                battleEnemy,
-                message,
-                selectedCommand);
+            battleRenderer.Draw(graphics, world, party, expedition, battle, message);
             return;
         }
 
@@ -46,13 +39,9 @@ public class GameRenderer : IDisposable
         }
 
         explorationRenderer.Draw(
-            graphics,
-            world,
-            party,
-            expedition,
-            isCellDiscovered,
-            currentObjective,
-            message);
+            graphics, world, party, expedition,
+            isCellDiscovered, isCellVisible,
+            currentObjective, message);
     }
 
     public void Dispose()
