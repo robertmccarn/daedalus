@@ -42,7 +42,8 @@ public sealed class EntityRenderer
     private static void DrawPartyMember(Graphics g, ExplorationRenderContext c, PartyRenderData member)
     {
         Point current = c.ToScreen(member.Position);
-        Point previous = c.ToScreen(member.PreviousPosition);
+        PartyMemberRuntime? runtime = c.Party.GetRuntime(member.MemberId);
+        Point previous = c.ToScreen(runtime?.PreviousPosition ?? member.Position);
 
         float moveT = member.AnimationState == CharacterAnimationState.Walk
             ? Math.Clamp(member.AnimationTick / 3f, 0f, 1f)
