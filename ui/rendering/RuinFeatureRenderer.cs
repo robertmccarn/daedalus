@@ -79,12 +79,12 @@ public sealed class RuinFeatureRenderer
         g.FillPolygon(voidFill, rim);
 
         using Pen edge = new(Color.FromArgb(135, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 2);
-        g.DrawLines(edge, rim.Take(rim.Length - 1).Append(rim[0]).ToArray());
+        g.DrawPolygon(edge, rim);
 
         using Pen depth = new(Color.FromArgb(80, p.Accent.R, p.Accent.G, p.Accent.B), 2);
         for (int i = 1; i <= 4; i++)
         {
-            int y = origin.Y + i * 10 + (feature.Variant * 3);
+            int y = origin.Y + i * 10 + feature.Variant * 3;
             g.DrawLine(depth, origin.X + 8, y, origin.X + width - 8, y - 4);
         }
     }
