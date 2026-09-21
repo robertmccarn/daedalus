@@ -223,8 +223,11 @@ public sealed class EntityRenderer
     private static void DrawEnemy(Graphics g, ExplorationRenderContext c, Character enemy)
     {
         Point s = c.ToScreen(new GridPosition(enemy.X, enemy.Y));
+        long now = AnimationClock.Now;
         int lift = GetElevation(c, enemy.X, enemy.Y) * 4;
-        Point origin = new(s.X, s.Y - lift);
+        int bob = (int)MathF.Round(
+            AnimationClock.Sine(now, 1700, enemy.X * 53L + enemy.Y * 97L) * 1.2f);
+        Point origin = new(s.X, s.Y + bob - lift);
 
         using Brush shadow = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
         g.FillEllipse(shadow, origin.X + 3, origin.Y + 20 + lift, 22, 7);
@@ -242,7 +245,8 @@ public sealed class EntityRenderer
         using Pen outline = new(c.Profile.Void, 2);
         g.DrawPolygon(outline, silhouette);
 
-        using Brush eye = new SolidBrush(Color.FromArgb(245, 220, 185));
+        int eyeAlpha = 190 + (int)(45 * AnimationClock.PingPong(now, 900, enemy.X * 19L + enemy.Y * 31L));
+        using Brush eye = new SolidBrush(Color.FromArgb(eyeAlpha, 220, 185));
         g.FillEllipse(eye, origin.X + 9, origin.Y + 10, 3, 3);
         g.FillEllipse(eye, origin.X + 17, origin.Y + 10, 3, 3);
     }
