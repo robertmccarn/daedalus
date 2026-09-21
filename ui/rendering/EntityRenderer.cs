@@ -5,10 +5,11 @@ public sealed class EntityRenderer
     public void Draw(Graphics g, ExplorationRenderContext context)
     {
         foreach (PartyRenderData member in context.Party.GetRenderData(context.Expedition)
-                     .OrderBy(member => GetElevation(context, member.Position.X, member.Position.Y))
-                     .ThenBy(member => member.Position.Y)
-                     .ThenBy(member => member.Position.X)
-                     .ThenBy(member => member.PartySlot))
+                     .OrderBy(member => RenderDepth.Entity(
+                         GetElevation(context, member.Position.X, member.Position.Y),
+                         member.Position.Y,
+                         member.Position.X,
+                         member.PartySlot)))
         {
             if (!context.IsDiscovered(member.Position.X, member.Position.Y) ||
                 !context.IsVisible(member.Position.X, member.Position.Y) ||
@@ -19,9 +20,10 @@ public sealed class EntityRenderer
         }
 
         foreach (Character enemy in context.World.Enemies
-                     .OrderBy(enemy => GetElevation(context, enemy.X, enemy.Y))
-                     .ThenBy(enemy => enemy.Y)
-                     .ThenBy(enemy => enemy.X))
+                     .OrderBy(enemy => RenderDepth.Entity(
+                         GetElevation(context, enemy.X, enemy.Y),
+                         enemy.Y,
+                         enemy.X)))
         {
             GridPosition pos = new(enemy.X, enemy.Y);
             if (!context.IsDiscovered(enemy.X, enemy.Y) ||
