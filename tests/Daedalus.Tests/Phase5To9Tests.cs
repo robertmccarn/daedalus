@@ -95,7 +95,7 @@ public class Phase5To9Tests
                 new PartyMember { Id = "arden", Name = "Arden", HP = 40, MaxHP = 40, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 8, Agility = 8 } },
                 new PartyMember { Id = "lyra", Name = "Lyra", HP = 35, MaxHP = 35, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 5, Agility = 12 } },
                 new PartyMember { Id = "marek", Name = "Marek", HP = 50, MaxHP = 50, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 11, Agility = 3 } },
-                new PartyMember { Id = "sera", Name = "Sera", HP = 36, MaxHP = 36, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 6, Agility = 10 } }
+                new PartyMember { Id = "sera", Name = "Sera", HP = 36, MaxHP = 36, MP = 10, MaxMP = 10, SpriteId = "sera", Stats = new StatsData { Strength = 6, Agility = 10 } }
             },
             CarriedInventory = new()
             {
