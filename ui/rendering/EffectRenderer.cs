@@ -25,7 +25,7 @@ public sealed class EffectRenderer
 
         foreach (InteractiveProp prop in context.World.Props)
         {
-            if (!context.IsVisible(prop.X, prop.Y) || !context.IsVisible(prop.X, prop.Y))
+            if (!context.IsVisible(prop.X, prop.Y))
                 continue;
 
             if (prop is Terminal terminal)
