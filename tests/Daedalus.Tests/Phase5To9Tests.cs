@@ -126,6 +126,12 @@ public class Phase5To9Tests
         Assert.Equal(BattleResult.Continue, result);
         Assert.True(damage > 0);
         Assert.NotEqual("lyra", battle.SelectedActor?.Id);
+
+        battle.SelectNextCommand(); // Skill
+        battle.PerformPlayerTurn(out _, out _);
+        Assert.True(battle.HasStatus(battle.Enemies[0] == enemyA ? "Hollow Guard:10:10:0" : "Hollow Stalker:12:10:1", "Poisoned") ||
+                    battle.HasStatus("Hollow Guard:10:10:0", "Poisoned") ||
+                    battle.HasStatus("Hollow Stalker:12:10:1", "Poisoned"));
     }
 
     [Fact]
