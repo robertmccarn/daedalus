@@ -87,25 +87,17 @@ public class GameWindow : Form
     private void HandleBattleInput(KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Escape)
-        {
             session.CancelBattle();
-        }
         else if (e.KeyCode == Keys.W)
-        {
             session.SelectPreviousBattleCommand();
-        }
         else if (e.KeyCode == Keys.S)
-        {
             session.SelectNextBattleCommand();
-        }
         else if (e.KeyCode == Keys.A)
-        {
             session.PerformBattleCommand();
-        }
+        else if (e.KeyCode == Keys.D)
+            session.SelectNextBattleTarget();
         else
-        {
             return;
-        }
 
         Invalidate();
     }
@@ -123,19 +115,17 @@ public class GameWindow : Form
 
     private void DrawGame(object? sender, PaintEventArgs e)
     {
-        BattleSystem? battle = session.Battle;
-
         renderer.Draw(
             e.Graphics,
             session.World,
             session.Party,
             session.StateManager.ActiveExpedition,
             session.State,
-            battle?.Enemy,
+            session.Battle,
             session.Message,
             session.CurrentObjective,
-            battle?.SelectedCommand ?? BattleCommand.Attack,
-            session.IsCellDiscovered);
+            session.IsCellDiscovered,
+            session.IsCellVisible);
     }
 
     protected override void Dispose(bool disposing)
