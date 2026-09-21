@@ -155,19 +155,89 @@ public class GameWorld
 
     private void CreateEnemies()
     {
-        Character goblin = new(
-            Floor == 1 ? "Goblin" : $"Goblin Depth {Floor}",
-            20 + (Floor - 1) * 3,
-            1 + (Floor - 1),
-            new Stats(
-                5 + Floor - 1,
-                2 + Floor / 2,
-                4 + Floor / 2,
-                3 + Floor / 2),
-            ExitX - 2,
-            ExitY);
+        BiomeType biome = BiomeCatalog.ForFloor(Floor);
 
-        Enemies.Add(goblin);
+        AddEnemy(
+            EnemyName(biome, 0),
+            20 + (Floor - 1) * 3,
+            1 + Floor - 1,
+            new Stats(5 + Floor - 1, 2 + Floor / 2, 4 + Floor / 2, 3 + Floor / 2),
+            FindOpenCellNear(ExitX - 2, ExitY));
+
+        if (Floor >= 2)
+        {
+            AddEnemy(
+                EnemyName(biome, 1),
+                15 + Floor * 2,
+                1 + Floor,
+                new Stats(3 + Floor / 2, 6 + Floor / 3, 7 + Floor / 2, 5),
+                FindOpenCellNear(ExitX - 4, ExitY + 1));
+        }
+
+        if (Floor >= 3)
+        {
+            AddEnemy(
+                EnemyName(biome, 2),
+                28 + Floor * 2,
+                2 + Floor,
+                new Stats(8 + Floor / 2, 3 + Floor / 3, 2 + Floor / 2, 4),
+                FindOpenCellNear(ExitX - 5, ExitY - 1));
+        }
+    }
+
+    private void AddEnemy(string name, int hp, int level, Stats stats, GridPosition position)
+    {
+        Enemies.Add(new Character(name, hp, level, stats, position.X, position.Y));
+    }
+
+    private string EnemyName(BiomeType biome, int variant) => biome switch
+    {
+        BiomeType.AshenHalls => variant switch
+        {
+            1 => "Ash Hound",
+            2 => "Cinder Brute",
+            _ => "Ash Warden"
+        },
+        BiomeType.VerdantBelow => variant switch
+        {
+            1 => "Root Stalker",
+            2 => "Verdant Husk",
+            _ => "Mossbound"
+        },
+        BiomeType.CrystalWastes => variant switch
+        {
+            1 => "Shard Moth",
+            2 => "Prism Sentinel",
+            _ => "Crystal Husk"
+        },
+        _ => variant switch
+        {
+            1 => "Hollow Stalker",
+            2 => "Ruined Brute",
+            _ => "Hollow Guard"
+        }
+    };
+
+    private GridPosition FindOpenCellNear(int centerX, int centerY)
+    {
+        for (int radius = 0; radius <= 5; radius++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    int x = centerX + dx;
+                    int y = centerY + dy;
+                    if (x < 0 || x >= Width || y < 0 || y >= Height)
+                        continue;
+                    if (!Dungeon[y, x].IsWalkable || GetEnemyAt(x, y) != null)
+                        continue;
+                    return new GridPosition(x, y);
+                }
+            }
+        }
+
+        return new GridPosition(Math.Clamp(centerX, 0, Width - 1), Math.Clamp(centerY, 0, Height - 1));
     }
 
     private void CreateProps()
