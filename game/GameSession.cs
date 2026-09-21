@@ -163,6 +163,7 @@ public class GameSession
 
     public void SelectPreviousBattleCommand() => Battle?.SelectPreviousCommand();
     public void SelectNextBattleCommand() => Battle?.SelectNextCommand();
+    public void SelectPreviousBattleTarget() => Battle?.SelectPreviousTarget();
     public void SelectNextBattleTarget() => Battle?.SelectNextTarget();
 
     public void CancelBattle()
