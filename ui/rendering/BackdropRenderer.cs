@@ -7,14 +7,17 @@ public sealed class BackdropRenderer
     {
         WorldPresentationProfile p = context.Profile;
         long now = AnimationClock.Now;
+        Rectangle viewport = context.Layout.WorldViewport;
+        int width = viewport.Width;
+        int height = viewport.Height;
         g.Clear(p.Void);
 
         using LinearGradientBrush gradient = new(
-            new Rectangle(0, 0, 860, 620),
+            viewport,
             p.Void,
             Color.FromArgb(38, 42, 47),
             LinearGradientMode.Vertical);
-        g.FillRectangle(gradient, 0, 0, 860, 620);
+        g.FillRectangle(gradient, viewport);
 
         // Distant ruin silhouettes create the large-scale environmental read
         // before the playable grid is drawn.
@@ -22,16 +25,17 @@ public sealed class BackdropRenderer
         for (int i = 0; i < 9; i++)
         {
             int drift = (int)MathF.Round(AnimationClock.Sine(now, 9000 + i * 220, i * 317) * 3f);
-            int x = 20 + i * 105 + drift;
-            int height = 90 + (i * 37 % 150);
-            g.FillRectangle(distant, x, 330 - height, 58, height);
-            g.FillRectangle(distant, x - 12, 300 - height, 82, 18);
+            int x = 20 + i * Math.Max(60, width / 9) + drift;
+            int ruinHeight = 90 + (i * 37 % Math.Max(90, height / 3));
+            int baseY = (int)(height * 0.53f);
+            g.FillRectangle(distant, x, baseY - ruinHeight, 58, ruinHeight);
+            g.FillRectangle(distant, x - 12, baseY - ruinHeight - 30, 82, 18);
         }
 
         using Pen cracks = new(Color.FromArgb(75, p.Accent.R, p.Accent.G, p.Accent.B), 2);
         for (int i = 0; i < 7; i++)
         {
-            int x = 90 + i * 120;
+            int x = 90 + i * Math.Max(70, width / 7);
             g.DrawLine(cracks, x, 80 + i * 19, x + 34, 160 + i * 21);
         }
 
