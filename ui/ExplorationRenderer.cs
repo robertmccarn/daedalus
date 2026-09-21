@@ -22,6 +22,7 @@ public class ExplorationRenderer : IDisposable
         PartyController party,
         ExpeditionState expedition,
         Func<int, int, bool> isCellDiscovered,
+        Func<int, int, bool> isCellVisible,
         string currentObjective,
         string message)
     {
@@ -30,17 +31,30 @@ public class ExplorationRenderer : IDisposable
             party,
             expedition,
             isCellDiscovered,
+            isCellVisible,
             currentObjective,
             message);
 
-        backdropRenderer.Draw(graphics, context);
-        worldRenderer.Draw(graphics, context);
-        ruinFeatureRenderer.Draw(graphics, context);
-        structureRenderer.Draw(graphics, context);
-        entityRenderer.Draw(graphics, context);
-        effectRenderer.Draw(graphics, context);
-        foregroundRenderer.Draw(graphics, context);
-        hudRenderer.Draw(graphics, context);
+        List<RenderItem> renderItems =
+        new()
+        {
+            new(RenderPass.Backdrop, 0, 0, g => backdropRenderer.Draw(g, context)),
+            new(RenderPass.Terrain, 0, 1, g => worldRenderer.Draw(g, context)),
+            new(RenderPass.Structures, 0, 2, g => ruinFeatureRenderer.Draw(g, context)),
+            new(RenderPass.Structures, 0, 3, g => structureRenderer.Draw(g, context)),
+            new(RenderPass.Entities, 0, 4, g => entityRenderer.Draw(g, context)),
+            new(RenderPass.Foreground, 0, 5, g => foregroundRenderer.Draw(g, context)),
+            new(RenderPass.Effects, 0, 6, g => effectRenderer.Draw(g, context)),
+            new(RenderPass.Hud, 0, 7, g => hudRenderer.Draw(g, context))
+        };
+
+        foreach (RenderItem item in renderItems
+                     .OrderBy(item => item.Pass)
+                     .ThenBy(item => item.Depth)
+                     .ThenBy(item => item.StableOrder))
+        {
+            item.Draw(graphics);
+        }
     }
 
     public void Dispose() => hudRenderer.Dispose();
