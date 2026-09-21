@@ -80,10 +80,6 @@ public class GameStateManager
             if (campaignMember == null) continue;
             campaignMember.Experience = expeditionMember.Experience;
             campaignMember.Level = expeditionMember.Level;
-            campaignMember.HP = expeditionMember.HP;
-            campaignMember.MaxHP = expeditionMember.MaxHP;
-            campaignMember.MP = expeditionMember.MP;
-            campaignMember.MaxMP = expeditionMember.MaxMP;
             campaignMember.Stats = CloneStats(expeditionMember.Stats);
             campaignMember.Morale = expeditionMember.Morale;
             campaignMember.Specializations = new List<string>(expeditionMember.Specializations);
