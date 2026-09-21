@@ -22,6 +22,7 @@ public class GameRenderer : IDisposable
         GameState gameState,
         Character? battleEnemy,
         string message,
+        string currentObjective,
         BattleCommand selectedCommand,
         Func<int, int, bool> isCellDiscovered)
     {
@@ -49,7 +50,9 @@ public class GameRenderer : IDisposable
             world,
             party,
             expedition,
-            isCellDiscovered);
+            isCellDiscovered,
+            currentObjective,
+            message);
     }
 
     public void Dispose()
