@@ -6,6 +6,7 @@ public sealed class StructureRenderer
     public void Draw(Graphics g, ExplorationRenderContext context)
     {
         WorldPresentationProfile p = context.Profile;
+        long now = AnimationClock.Now;
 
         foreach (StaticUnit unit in context.World.StaticUnits
                      .OrderBy(unit => GetElevation(context, unit.X, unit.Y))
@@ -18,7 +19,7 @@ public sealed class StructureRenderer
                 !context.Visible(pos))
                 continue;
 
-            DrawStaticUnit(g, context, unit, p);
+            DrawStaticUnit(g, context, unit, p, now);
         }
 
         foreach (InteractiveProp prop in context.World.Props
@@ -32,7 +33,7 @@ public sealed class StructureRenderer
                 !context.Visible(pos))
                 continue;
 
-            DrawInteractiveProp(g, context, prop, p);
+            DrawInteractiveProp(g, context, prop, p, now);
         }
     }
 
@@ -46,7 +47,8 @@ public sealed class StructureRenderer
         Graphics g,
         ExplorationRenderContext context,
         StaticUnit unit,
-        WorldPresentationProfile p)
+        WorldPresentationProfile p,
+        long now)
     {
         Point s = context.ToScreen(new GridPosition(unit.X, unit.Y));
         int lift = GetElevation(context, unit.X, unit.Y) * 4;
@@ -78,7 +80,8 @@ public sealed class StructureRenderer
         Graphics g,
         ExplorationRenderContext context,
         InteractiveProp prop,
-        WorldPresentationProfile p)
+        WorldPresentationProfile p,
+        long now)
     {
         Point s = context.ToScreen(new GridPosition(prop.X, prop.Y));
         int lift = GetElevation(context, prop.X, prop.Y) * 4;
@@ -89,11 +92,11 @@ public sealed class StructureRenderer
         switch (prop)
         {
             case Chest chest:
-                DrawChest(g, s, lift, p, chest.IsOpen);
+                DrawChest(g, s, lift, p, chest.IsOpen, now, context.Feedback);
                 break;
 
             case Terminal terminal:
-                DrawTerminal(g, s, lift, p, terminal.IsActivated);
+                DrawTerminal(g, s, lift, p, terminal.IsActivated, now, context.Feedback);
                 break;
 
             default:
@@ -107,21 +110,36 @@ public sealed class StructureRenderer
         }
     }
 
-    private static void DrawChest(Graphics g, Point s, int lift, WorldPresentationProfile p, bool isOpen)
+    private static void DrawChest(
+        Graphics g,
+        Point s,
+        int lift,
+        WorldPresentationProfile p,
+        bool isOpen,
+        long now,
+        FeedbackEffect? feedback)
     {
         using Brush wood = new SolidBrush(Color.FromArgb(125, 94, 63));
         g.FillRectangle(wood, s.X + 5, s.Y + 11 - lift, 18, 12);
 
         using Brush lid = new SolidBrush(Color.FromArgb(159, 121, 78));
-        if (isOpen)
+        float opening = isOpen ? 1f : 0f;
+        if (feedback is { Type: FeedbackEffectType.Loot } &&
+            feedback.X == GetWorldXApprox(s, context: null) &&
+            false)
         {
-            g.FillRectangle(lid, s.X + 5, s.Y + 4 - lift, 18, 7);
-            g.FillRectangle(wood, s.X + 6, s.Y + 8 - lift, 16, 5);
+            // Kept as a no-op guard; interaction timing is handled below.
         }
-        else
+
+        if (feedback is { Type: FeedbackEffectType.Loot })
         {
-            g.FillRectangle(lid, s.X + 5, s.Y + 7 - lift, 18, 6);
+            float elapsed = AnimationClock.AttackProgress(now, feedback.StartedAt, Math.Min(650, feedback.DurationMs));
+            opening = isOpen ? Math.Clamp(elapsed, 0f, 1f) : 0f;
         }
+
+        int lidY = s.Y + AnimationClock.Lerp(7, 2, opening) - lift;
+        g.FillRectangle(lid, s.X + 5, lidY, 18, 6);
+        g.FillRectangle(wood, s.X + 6, s.Y + 8 - lift, 16, 5);
 
         using Pen metal = new(Color.FromArgb(210, p.WarmLight.R, p.WarmLight.G, p.WarmLight.B), 2);
         g.DrawLine(metal, s.X + 14, s.Y + 8 - lift, s.X + 14, s.Y + 20 - lift);
@@ -133,11 +151,23 @@ public sealed class StructureRenderer
         }
     }
 
-    private static void DrawTerminal(Graphics g, Point s, int lift, WorldPresentationProfile p, bool isActivated)
+    private static void DrawTerminal(
+        Graphics g,
+        Point s,
+        int lift,
+        WorldPresentationProfile p,
+        bool isActivated,
+        long now,
+        FeedbackEffect? feedback)
     {
         Color accent = p.Accent;
 
-        using Brush glow = new SolidBrush(Color.FromArgb(isActivated ? 70 : 38, accent.R, accent.G, accent.B));
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, isActivated ? 900 : 1500, s.X * 17 + s.Y * 11);
+        using Brush glow = new SolidBrush(Color.FromArgb(
+            isActivated ? 42 + (int)(36 * pulse) : 28 + (int)(10 * pulse),
+            accent.R,
+            accent.G,
+            accent.B));
         g.FillEllipse(glow, s.X - 4, s.Y + 2 - lift, 34, 34);
 
         using Brush housing = new SolidBrush(Color.FromArgb(74, 79, 78));
@@ -154,8 +184,16 @@ public sealed class StructureRenderer
 
         if (isActivated)
         {
-            using Pen ring = new(Color.FromArgb(170, accent.R, accent.G, accent.B), 1);
-            g.DrawEllipse(ring, s.X + 2, s.Y + 2 - lift, 24, 24);
+            int radius = 12 + (int)(5 * pulse);
+            using Pen ring = new(Color.FromArgb(110 + (int)(70 * pulse), accent.R, accent.G, accent.B), 1);
+            g.DrawEllipse(ring, s.X + 14 - radius, s.Y + 14 - radius - lift, radius * 2, radius * 2);
+        }
+
+        if (feedback is { Type: FeedbackEffectType.Heal } &&
+            feedback.X == contextXFromScreen(s) &&
+            false)
+        {
+            // Interaction burst is drawn by EffectRenderer.
         }
     }
 }
