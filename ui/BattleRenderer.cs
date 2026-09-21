@@ -115,7 +115,7 @@ public class BattleRenderer : IDisposable
                 g.DrawEllipse(marker, x - 6, y - 6, 60, 60);
             }
 
-            g.DrawString(enemy.Name, new Font(FontFamily.GenericMonospace, 9, FontStyle.Bold), Brushes.White, x - 12, y + 54);
+            g.DrawString(enemy.Name, smallFont, Brushes.White, x - 12, y + 54);
             g.DrawString($"HP {enemy.HP}/{enemy.MAXHP}", microFont, Brushes.Gainsboro, x - 12, y + 68);
             index++;
         }
@@ -171,7 +171,7 @@ public class BattleRenderer : IDisposable
         int width = maxHp <= 0 ? 0 : 60 * hp / maxHp;
         g.FillRectangle(hpFill, x, y + 58, width, 6);
 
-        g.DrawString(name, new Font(FontFamily.GenericMonospace, 9, FontStyle.Bold), Brushes.White, x - 4, y + 69);
+        g.DrawString(name, smallFont, Brushes.White, x - 4, y + 69);
         g.DrawString($"HP {hp}/{maxHp}", microFont, Brushes.Gainsboro, x - 4, y + 83);
 
         if (selected)
@@ -234,7 +234,8 @@ public class BattleRenderer : IDisposable
         {
             Color c = commands[i] == selected ? p.Accent : Color.FromArgb(190, 200, 200, 205);
             string prefix = commands[i] == selected ? "▶ " : "  ";
-            g.DrawString(prefix + commands[i].ToString().ToUpperInvariant(), new Font(FontFamily.GenericMonospace, 12), new SolidBrush(c), 55, 508 + i * 23);
+            using Brush commandBrush = new SolidBrush(c);
+            g.DrawString(prefix + commands[i].ToString().ToUpperInvariant(), smallFont, commandBrush, 55, 508 + i * 23);
         }
     }
 
