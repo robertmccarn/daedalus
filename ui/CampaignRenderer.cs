@@ -10,6 +10,7 @@ public sealed class CampaignRenderer : IDisposable
 
     public void Draw(Graphics g, GameStateManager stateManager, string message)
     {
+        long now = AnimationClock.Now;
         g.Clear(Color.FromArgb(8, 10, 13));
         CampaignState c = stateManager.Campaign;
 
@@ -40,7 +41,12 @@ public sealed class CampaignRenderer : IDisposable
                 _ => Color.FromArgb(122, 152, 157)
             };
 
-            using Brush marker = new SolidBrush(accent);
+            float memberPulse = 0.5f + 0.5f * AnimationClock.Sine(now, 1700 + y * 3, y);
+            using Brush marker = new SolidBrush(Color.FromArgb(
+                145 + (int)(80 * memberPulse),
+                accent.R,
+                accent.G,
+                accent.B));
             g.FillRectangle(marker, 390, y + 2, 5, 27);
             g.DrawString(member.Name, body, Brushes.White, 405, y);
             g.DrawString($"LV {member.Level:00}  HP {member.MaxHP:00}  M {member.Morale:000}", small, Brushes.Gainsboro, 510, y + 2);
@@ -63,7 +69,12 @@ public sealed class CampaignRenderer : IDisposable
             materialY += 22;
         }
 
-        using Brush accentBrush = new SolidBrush(Color.FromArgb(210, 125, 180, 177));
+        float actionPulse = 0.5f + 0.5f * AnimationClock.Sine(now, 1100);
+        using Brush accentBrush = new SolidBrush(Color.FromArgb(
+            170 + (int)(65 * actionPulse),
+            125,
+            180,
+            177));
         g.DrawString("ENTER  BEGIN NEXT EXPEDITION", section, accentBrush, 72, 590);
 
         if (!string.IsNullOrWhiteSpace(message))
