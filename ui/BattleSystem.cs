@@ -346,7 +346,7 @@ public sealed class BattleSystem
         if (HasStatus(target, "Exposed"))
         {
             damage += 4;
-            ClearStatus(target, "Exposed");
+            ClearStatus(GetEnemyId(target), "Exposed");
         }
 
         target.TakeDamage(damage);
