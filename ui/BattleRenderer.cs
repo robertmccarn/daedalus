@@ -260,6 +260,8 @@ public class BattleRenderer : IDisposable
             microFont,
             Brushes.White,
             new RectangleF(415, 545, 375, 82));
+        using Brush controls = new SolidBrush(Color.FromArgb(165, 205, 210, 210));
+        g.DrawString("W/S or ↑/↓ COMMAND   A/ENTER/SPACE ACT   D/←/→ TARGET   ESC RETREAT", microFont, controls, 415, 632);
     }
 
     public void Dispose()
