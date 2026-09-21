@@ -25,9 +25,13 @@ public class ExplorationRenderer : IDisposable
         string message,
         FeedbackEffect? feedback)
     {
+        ViewportLayout layout = ViewportLayout.ForClientSize(
+            (int)Math.Max(1, graphics.VisibleClipBounds.Width),
+            (int)Math.Max(1, graphics.VisibleClipBounds.Height));
+
         ExplorationRenderContext context = new(
             world, party, expedition, isCellDiscovered, isCellVisible,
-            currentObjective, message, feedback);
+            currentObjective, message, feedback, layout);
 
         List<RenderItem> renderItems =
         new()
