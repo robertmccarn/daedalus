@@ -34,7 +34,10 @@ public class GameStateManager
         leader.MaxHP = Math.Max(leader.MaxHP, maxHealth);
         ActiveExpedition.Health = leader.HP;
         ActiveExpedition.MaxHealth = leader.MaxHP;
-        DiscoverArea(startX, startY);
+
+        // Reveal the starting chamber, not the surrounding route. This makes the
+        // reference room immediately readable while preserving exploration fog.
+        DiscoverArea(startX, startY, radius: 5);
     }
 
     public void StartNewExpedition()
