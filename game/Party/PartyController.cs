@@ -202,14 +202,22 @@ public sealed class PartyController
         }
 
         HashSet<GridPosition> occupied = new() { leader.Position };
+        HashSet<GridPosition> reservedCurrentPositions = followers
+            .Select(follower => follower.Position)
+            .Where(position => position != leader.Position)
+            .ToHashSet();
+
         foreach (FollowerMovementIntent intent in intents)
         {
             PartyMemberRuntime follower = members.First(member => member.MemberId == intent.MemberId);
+            reservedCurrentPositions.Remove(follower.Position);
+
             GridPosition resolved = ResolvePosition(
                 follower,
                 intent.DesiredPosition,
                 leader.Position,
                 occupied,
+                reservedCurrentPositions,
                 intent.CurrentPosition);
 
             follower.Direction = leader.Direction;
@@ -233,19 +241,61 @@ public sealed class PartyController
         GridPosition desired,
         GridPosition leaderPosition,
         HashSet<GridPosition> occupied,
+        HashSet<GridPosition> reservedCurrentPositions,
         GridPosition fallbackOrigin)
     {
         foreach (GridPosition candidate in CandidatePositions(desired, fallbackOrigin))
         {
-            if (candidate == leaderPosition || occupied.Contains(candidate))
+            if (candidate == leaderPosition ||
+                occupied.Contains(candidate) ||
+                reservedCurrentPositions.Contains(candidate))
                 continue;
 
-            if (world.IsWalkable(candidate.X, candidate.Y) &&
-                world.GetEnemyAt(candidate.X, candidate.Y) == null)
+            if (IsValidPartyPosition(candidate))
                 return candidate;
         }
 
-        return follower.Position;
+        // The follower's current cell is released from the reservation before
+        // resolution, so this is a deterministic stall rather than an overlap.
+        if (follower.Position != leaderPosition &&
+            !occupied.Contains(follower.Position) &&
+            IsValidPartyPosition(follower.Position))
+        {
+            return follower.Position;
+        }
+
+        return FindNearestValidPosition(fallbackOrigin, leaderPosition, occupied, reservedCurrentPositions);
+    }
+
+    private bool IsValidPartyPosition(GridPosition position) =>
+        world.IsWalkable(position.X, position.Y) &&
+        world.GetEnemyAt(position.X, position.Y) == null;
+
+    private GridPosition FindNearestValidPosition(
+        GridPosition origin,
+        GridPosition leaderPosition,
+        HashSet<GridPosition> occupied,
+        HashSet<GridPosition> reservedCurrentPositions)
+    {
+        const int maxRadius = 4;
+
+        for (int radius = 1; radius <= maxRadius; radius++)
+        {
+            foreach (GridPosition candidate in RingPositions(origin, radius))
+            {
+                if (candidate == leaderPosition ||
+                    occupied.Contains(candidate) ||
+                    reservedCurrentPositions.Contains(candidate))
+                    continue;
+
+                if (IsValidPartyPosition(candidate))
+                    return candidate;
+            }
+        }
+
+        // Generated floors should never reach this point. Returning the origin
+        // keeps the result deterministic if the world is temporarily exhausted.
+        return origin;
     }
 
     private static IEnumerable<GridPosition> CandidatePositions(
@@ -254,14 +304,28 @@ public sealed class PartyController
     {
         yield return desired;
         yield return fallbackOrigin;
-        yield return new GridPosition(fallbackOrigin.X, fallbackOrigin.Y + 1);
-        yield return new GridPosition(fallbackOrigin.X - 1, fallbackOrigin.Y);
-        yield return new GridPosition(fallbackOrigin.X + 1, fallbackOrigin.Y);
-        yield return new GridPosition(fallbackOrigin.X, fallbackOrigin.Y - 1);
-        yield return new GridPosition(desired.X, desired.Y + 1);
-        yield return new GridPosition(desired.X - 1, desired.Y);
-        yield return new GridPosition(desired.X + 1, desired.Y);
-        yield return new GridPosition(desired.X, desired.Y - 1);
+
+        foreach (GridPosition candidate in RingPositions(desired, 1))
+            yield return candidate;
+
+        foreach (GridPosition candidate in RingPositions(fallbackOrigin, 1))
+            yield return candidate;
+
+        foreach (GridPosition candidate in RingPositions(desired, 2))
+            yield return candidate;
+    }
+
+    private static IEnumerable<GridPosition> RingPositions(
+        GridPosition center,
+        int radius)
+    {
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            int dy = radius - Math.Abs(dx);
+            yield return new GridPosition(center.X + dx, center.Y - dy);
+            if (dy != 0)
+                yield return new GridPosition(center.X + dx, center.Y + dy);
+        }
     }
 
     private static GridPosition GetHistoricalLeaderPosition(
