@@ -411,6 +411,9 @@ public class Phase4PartyTests
                 AssertValidParty(party, world, 4, "sera");
         }
 
+        PartyMember expeditionLeader = manager.ActiveExpedition.Party
+            .Single(member => member.Id == "sera");
+        expeditionLeader.Morale = 80;
         MoraleSystem.ApplyEvent(manager.ActiveExpedition, MoraleEventType.LootFound);
         ExtractionSystem.ApplyReward(
             manager.Campaign,
@@ -435,7 +438,7 @@ public class Phase4PartyTests
             PartyMember loadedLeader = loaded.ActiveExpedition.Party
                 .Single(member => member.Id == "sera");
 
-            Assert.Equal(100, loadedLeader.Morale);
+            Assert.Equal(82, loadedLeader.Morale);
             Assert.Equal(25, loaded.ActiveExpedition.CarriedGold);
             Assert.Contains(
                 loaded.ActiveExpedition.CarriedMaterials,
@@ -444,6 +447,9 @@ public class Phase4PartyTests
             Assert.True(ExtractionSystem.Extract(loaded));
             Assert.Equal("Extracted", loaded.ActiveExpedition.ExtractionState);
             Assert.Equal(25, loaded.Campaign.Gold);
+            Assert.Equal(
+                82,
+                loaded.Campaign.PartyRoster.Single(member => member.Id == "sera").Morale);
             Assert.Contains(
                 loaded.Campaign.Materials,
                 material => material.Id == "monster-residue");
