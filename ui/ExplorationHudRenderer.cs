@@ -13,17 +13,18 @@ public class ExplorationHudRenderer : IDisposable
     public void Draw(Graphics graphics, ExplorationRenderContext context)
     {
         WorldPresentationProfile p = context.Profile;
-        const int panelX = 860;
-        const int panelWidth = 240;
-        const int contentX = 882;
+        Rectangle hud = context.Layout.HudViewport;
+        int panelX = hud.X;
+        int panelWidth = hud.Width;
+        int contentX = hud.X + 22;
 
         using Brush panel = new SolidBrush(Color.FromArgb(232, 12, 15, 18));
-        graphics.FillRectangle(panel, panelX, 0, panelWidth, 700);
+        graphics.FillRectangle(panel, hud);
 
         using Pen divider = new(
             Color.FromArgb(180, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B),
             1);
-        graphics.DrawLine(divider, panelX, 0, panelX, 700);
+        graphics.DrawLine(divider, panelX, hud.Top, panelX, hud.Bottom);
 
         using Brush title = new SolidBrush(p.Bone());
         using Brush accent = new SolidBrush(p.Accent);
@@ -31,7 +32,8 @@ public class ExplorationHudRenderer : IDisposable
         graphics.DrawString(BiomeCatalog.Name(context.Biome), smallFont, accent, contentX, 47);
         graphics.DrawString($"DEPTH {context.World.Floor:00}", uiFont, Brushes.White, contentX, 64);
 
-        minimap.Draw(graphics, context, new Rectangle(contentX, 92, 195, 135));
+        int minimapWidth = Math.Min(195, Math.Max(120, panelWidth - 45));
+        minimap.Draw(graphics, context, new Rectangle(contentX, 92, minimapWidth, 135));
 
         PartyMember? leader = context.Expedition.Party
             .FirstOrDefault(member => member.Id == context.Party.LeaderId);
@@ -87,7 +89,7 @@ public class ExplorationHudRenderer : IDisposable
 
         if (node != null)
         {
-            DrawPanel(graphics, divider, 875, 510, 210, 48);
+            DrawPanel(graphics, divider, hud.X + 15, 510, panelWidth - 30, 48);
 
             using Brush promptText = new SolidBrush(Color.White);
             using Brush promptAccent = new SolidBrush(p.Accent);
@@ -116,7 +118,8 @@ public class ExplorationHudRenderer : IDisposable
         WorldPresentationProfile profile,
         int top)
     {
-        DrawPanel(graphics, null, 875, top, 210, 49);
+        Rectangle hud = context.Layout.HudViewport;
+        DrawPanel(graphics, null, hud.X + 15, top, hud.Width - 30, 49);
 
         using Brush heading = new SolidBrush(profile.Accent);
         using Brush text = new SolidBrush(Color.White);
@@ -126,7 +129,7 @@ public class ExplorationHudRenderer : IDisposable
             context.CurrentObjective,
             microFont,
             text,
-            new RectangleF(886, top + 19, 186, 27));
+            new RectangleF(hud.X + 26, top + 19, hud.Width - 54, 27));
     }
 
     private void DrawMessage(
@@ -135,7 +138,8 @@ public class ExplorationHudRenderer : IDisposable
         WorldPresentationProfile profile,
         int top)
     {
-        DrawPanel(graphics, null, 875, top, 210, 54);
+        Rectangle hud = context.Layout.HudViewport;
+        DrawPanel(graphics, null, hud.X + 15, top, hud.Width - 30, 54);
 
         using Brush heading = new SolidBrush(profile.WarmLight);
         using Brush text = new SolidBrush(Color.FromArgb(235, 238, 240, 244));
@@ -150,7 +154,7 @@ public class ExplorationHudRenderer : IDisposable
             message,
             microFont,
             text,
-            new RectangleF(886, top + 19, 186, 31));
+            new RectangleF(hud.X + 26, top + 19, hud.Width - 54, 31));
     }
 
     private static void DrawPanel(
