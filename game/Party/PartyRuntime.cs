@@ -44,6 +44,7 @@ public readonly record struct PartyRenderData(
     GridPosition Position,
     CharacterDirection Direction,
     CharacterAnimationState AnimationState,
+    int AnimationTick,
     string SpriteId,
     int PartySlot,
     bool IsLeader);
