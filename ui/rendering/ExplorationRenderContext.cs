@@ -10,6 +10,7 @@ public sealed class ExplorationRenderContext
     public Func<int, int, bool> IsVisible { get; }
     public string CurrentObjective { get; }
     public string Message { get; }
+    public FeedbackEffect? Feedback { get; }
     public int CameraX { get; }
     public int CameraY { get; }
     public int TileSize { get; } = 28;
@@ -23,7 +24,8 @@ public sealed class ExplorationRenderContext
         Func<int, int, bool> isCellDiscovered,
         Func<int, int, bool> isCellVisible,
         string currentObjective,
-        string message)
+        string message,
+        FeedbackEffect? feedback)
     {
         World = world;
         Party = party;
@@ -32,6 +34,7 @@ public sealed class ExplorationRenderContext
         IsVisible = isCellVisible;
         CurrentObjective = currentObjective;
         Message = message;
+        Feedback = feedback;
 
         GridPosition leader = party.LeaderPosition;
         CameraX = leader.X * TileSize - 420;
