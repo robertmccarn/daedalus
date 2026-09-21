@@ -235,6 +235,9 @@ public class GameSession
     public bool IsCellVisible(int x, int y) =>
         VisibilitySystem.IsVisible(World, Party.LeaderPosition, new GridPosition(x, y));
 
+    private bool IsCellVisibleFromLeader(int x, int y) =>
+        VisibilitySystem.IsVisible(World, Party.LeaderPosition, new GridPosition(x, y));
+
     public bool Save(string path) => StateManager.Save(path);
 
     public bool Load(string path)
@@ -329,7 +332,12 @@ public class GameSession
         StateManager.StartNewExpedition(
             World.SpawnX, World.SpawnY, 30, 30, World.Floor, World.FloorSeed,
             StateManager.Campaign.PartyRoster.Take(4).Select(member => member.Id).ToArray(),
-            StateManager.Campaign.PartyRoster[0].Id, PartyFormationType.Column);
+            StateManager.Campaign.PartyRoster[0].Id,
+            PartyFormationType.Column,
+            (x, y) => VisibilitySystem.IsVisible(
+                World,
+                new GridPosition(World.SpawnX, World.SpawnY),
+                new GridPosition(x, y)));
 
         Party.Initialize(StateManager.ActiveExpedition, new GridPosition(World.SpawnX, World.SpawnY));
         SyncCompatibilityPlayer();
@@ -378,7 +386,10 @@ public class GameSession
         World.RebuildFloor(expedition.FloorSeed, expedition.CurrentFloor);
         Party.ReformForFloor(expedition, new GridPosition(World.SpawnX, World.SpawnY));
         SyncCompatibilityPlayer();
-        StateManager.SetExpeditionPosition(World.SpawnX, World.SpawnY);
+        StateManager.SetExpeditionPosition(
+            World.SpawnX,
+            World.SpawnY,
+            IsCellVisibleFromLeader);
         RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
@@ -415,7 +426,8 @@ public class GameSession
             Party.LeaderPosition.X,
             Party.LeaderPosition.Y,
             World.Player.HP,
-            World.Player.MAXHP);
+            World.Player.MAXHP,
+            IsCellVisibleFromLeader);
         leader.HP = World.Player.HP;
         leader.MaxHP = World.Player.MAXHP;
         leader.Level = World.Player.Level;
