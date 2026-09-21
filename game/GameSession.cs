@@ -5,6 +5,8 @@ public class GameSession
     private readonly GameLogic logic;
     private FeedbackEffect? feedback;
     private bool landmarkIntroduced;
+    private bool devMenuOpen;
+    private int devSelectedFloor = 1;
 
     public GameWorld World { get; }
     public PartyController Party { get; }
@@ -14,6 +16,9 @@ public class GameSession
     public GameStateManager StateManager { get; }
     public ExtractionSummary? LastExtraction { get; private set; }
     public FeedbackEffect? Feedback => feedback;
+    public bool DevMenuOpen => devMenuOpen;
+    public int DevSelectedFloor => devSelectedFloor;
+    public int DevPartyLevel => DevMenuState.PartyLevelForFloor(devSelectedFloor);
 
     public string CurrentObjective =>
         StateManager.ActiveExpedition.CurrentFloor <= 1
@@ -159,6 +164,95 @@ public class GameSession
         }
 
         TriggerExplorationEvent();
+    }
+
+    public void ToggleDevMenu()
+    {
+        if (State == GameState.Battle)
+            return;
+
+        devMenuOpen = !devMenuOpen;
+        if (devMenuOpen)
+            devSelectedFloor = DevMenuState.NormalizeFloor(StateManager.ActiveExpedition.CurrentFloor);
+    }
+
+    public void CloseDevMenu() => devMenuOpen = false;
+
+    public void AdjustDevFloor(int delta)
+    {
+        if (!devMenuOpen)
+            return;
+
+        devSelectedFloor = DevMenuState.NormalizeFloor(devSelectedFloor + delta);
+    }
+
+    public void JumpToDevFloor()
+    {
+        if (!devMenuOpen)
+            return;
+
+        int floor = DevMenuState.NormalizeFloor(devSelectedFloor);
+        int level = DevMenuState.PartyLevelForFloor(floor);
+
+        ConfigureDevRoster(level, floor);
+
+        World.RebuildFloor(Random.Shared.Next(), floor);
+        StateManager.StartNewExpedition(
+            World.SpawnX,
+            World.SpawnY,
+            1,
+            1,
+            floor,
+            World.FloorSeed,
+            StateManager.Campaign.PartyRoster.Take(4).Select(member => member.Id).ToArray(),
+            StateManager.Campaign.PartyRoster[0].Id,
+            PartyFormationType.Column,
+            (x, y) => VisibilitySystem.IsVisible(
+                World,
+                new GridPosition(World.SpawnX, World.SpawnY),
+                new GridPosition(x, y)));
+
+        foreach (PartyMember member in StateManager.ActiveExpedition.Party)
+        {
+            PartyMember source = StateManager.Campaign.PartyRoster.First(candidate => candidate.Id == member.Id);
+            member.Level = source.Level;
+            member.Experience = source.Experience;
+            member.MaxHP = source.MaxHP;
+            member.HP = source.MaxHP;
+            member.MaxMP = source.MaxMP;
+            member.MP = source.MaxMP;
+            member.Stats = new StatsData
+            {
+                Strength = source.Stats.Strength,
+                Magic = source.Stats.Magic,
+                Agility = source.Stats.Agility,
+                Luck = source.Stats.Luck
+            };
+            member.Morale = 100;
+            member.EquippedGearIds = new List<string>(source.EquippedGearIds);
+        }
+
+        StateManager.ActiveExpedition.Health = StateManager.ActiveExpedition.Party.First().HP;
+        StateManager.ActiveExpedition.MaxHealth = StateManager.ActiveExpedition.Party.First().MaxHP;
+
+        Party.Initialize(
+            StateManager.ActiveExpedition,
+            new GridPosition(World.SpawnX, World.SpawnY),
+            StateManager.ActiveExpedition.LeaderId,
+            PartyFormationType.Column);
+
+        SyncCompatibilityPlayer();
+        SynchronizeExpedition();
+        RecordNodeVisit(World.SpawnX, World.SpawnY);
+        UpdateVisibility();
+        ApplyGearBonuses();
+
+        State = GameState.Exploration;
+        Battle = null;
+        feedback = null;
+        landmarkIntroduced = false;
+        devMenuOpen = false;
+        Message = $"DEV JUMP: depth {floor}, party level {level}.";
     }
 
     public void SelectPreviousBattleCommand() => Battle?.SelectPreviousCommand();
@@ -329,6 +423,73 @@ public class GameSession
         bool equipped = InventorySystem.EquipGear(StateManager.Campaign, StateManager.ActiveExpedition, targetId, gearId);
         if (equipped) ApplyGearBonuses();
         return equipped;
+    }
+
+    private void ConfigureDevRoster(int level, int floor)
+    {
+        int levelDelta = Math.Max(0, level - 1);
+        int weaponPower = 3 + levelDelta;
+        int armorPower = 2 + levelDelta;
+        int ringPower = Math.Max(1, 1 + levelDelta / 2);
+
+        string[] slots = { "Weapon", "Armor", "Ring" };
+        string prefix = "dev-";
+
+        StateManager.Campaign.Gear.RemoveAll(gear =>
+            gear.Id.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+        foreach (PartyMember member in StateManager.Campaign.PartyRoster.Take(4))
+        {
+            int baseMaxHp = member.SpriteId.ToLowerInvariant() switch
+            {
+                "marek" => 36,
+                "lyra" => 24,
+                "sera" => 26,
+                _ => 30
+            };
+
+            int baseStrength = member.Stats.Strength;
+            int baseMagic = member.Stats.Magic;
+            int baseAgility = member.Stats.Agility;
+            int baseLuck = member.Stats.Luck;
+
+            member.Level = level;
+            member.Experience = 0;
+            member.MaxHP = baseMaxHp + levelDelta * 4;
+            member.HP = member.MaxHP;
+            member.MaxMP = 10 + levelDelta;
+            member.MP = member.MaxMP;
+            member.Stats = new StatsData
+            {
+                Strength = baseStrength + levelDelta,
+                Magic = baseMagic + levelDelta,
+                Agility = baseAgility + levelDelta,
+                Luck = baseLuck + Math.Min(levelDelta, floor)
+            };
+            member.Morale = 100;
+            member.EquippedGearIds.Clear();
+
+            AddDevGear(member, "Weapon", weaponPower, floor);
+            AddDevGear(member, "Armor", armorPower, floor);
+            AddDevGear(member, "Ring", ringPower, floor);
+        }
+    }
+
+    private void AddDevGear(PartyMember member, string slot, int power, int floor)
+    {
+        string safeMember = member.Id.Replace(" ", string.Empty, StringComparison.Ordinal);
+        string id = $"dev-{floor}-{safeMember}-{slot.ToLowerInvariant()}";
+        string name = $"Dev {slot} +{power}";
+
+        StateManager.Campaign.Gear.Add(new Gear
+        {
+            Id = id,
+            Name = name,
+            Slot = slot,
+            Power = power
+        });
+
+        member.EquippedGearIds.Add(id);
     }
 
     private void StartNewExpeditionInternal()
