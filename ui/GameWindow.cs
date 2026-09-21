@@ -14,7 +14,7 @@ public class GameWindow : Form
         renderer = new GameRenderer(world);
         renderTimer = new System.Windows.Forms.Timer { Interval = 80 };
 
-        Text = "Dungeon";
+        Text = "Daedalus";
         ClientSize = new Size(1100, 700);
         BackColor = Color.Black;
         ForeColor = Color.White;
@@ -147,6 +147,7 @@ public class GameWindow : Form
             session.State,
             battle?.Enemy,
             session.Message,
+            session.CurrentObjective,
             battle?.SelectedCommand ?? BattleCommand.Attack,
             session.IsCellDiscovered);
     }
