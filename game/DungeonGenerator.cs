@@ -23,6 +23,10 @@ public class DungeonGenerator
         Room startingRoom = rooms[0];
         Room finalRoom = rooms[rooms.Count - 1];
 
+        // Give the starting area enough breathing room to serve as the visual
+        // reference environment without changing the generated route structure.
+        CarveReferenceChamber(map, startingRoom, width, height);
+
         (int X, int Y) spawn = startingRoom.Center;
         (int X, int Y) exit = finalRoom.Center;
 
@@ -95,6 +99,30 @@ public class DungeonGenerator
             CarveVerticalCorridor(map, startY, endY, startX);
             CarveHorizontalCorridor(map, startX, endX, endY);
         }
+    }
+
+    private static void CarveReferenceChamber(
+        Tile[,] map,
+        Room room,
+        int width,
+        int height)
+    {
+        const int chamberWidth = 13;
+        const int chamberHeight = 9;
+
+        int minX = Math.Clamp(
+            room.CenterX - chamberWidth / 2,
+            1,
+            Math.Max(1, width - chamberWidth - 1));
+
+        int minY = Math.Clamp(
+            room.CenterY - chamberHeight / 2,
+            1,
+            Math.Max(1, height - chamberHeight - 1));
+
+        for (int y = minY; y < minY + chamberHeight; y++)
+        for (int x = minX; x < minX + chamberWidth; x++)
+            map[y, x] = CreateFloor();
     }
 
     private static void CarveRoom(Tile[,] map, Room room)
