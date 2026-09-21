@@ -135,8 +135,8 @@ public class GameWindow : Form
             return true;
         }
 
-        // Confirm: A, Enter, or Space.
-        if (key is Keys.A or Keys.Enter or Keys.Space)
+        // Confirm: E, Enter, or Space.
+        if (key is Keys.E or Keys.Enter or Keys.Space)
         {
             session.PerformBattleCommand();
             return true;
