@@ -4,6 +4,50 @@ using Xunit;
 public class Phase5To9Tests
 {
     [Fact]
+    public void DevMenu_NormalizesAndMapsFloorToPartyLevel()
+    {
+        Assert.Equal(1, DevMenuState.NormalizeFloor(-10));
+        Assert.Equal(99, DevMenuState.NormalizeFloor(150));
+        Assert.Equal(37, DevMenuState.NormalizeFloor(37));
+        Assert.Equal(37, DevMenuState.PartyLevelForFloor(37));
+    }
+
+    [Fact]
+    public void GameSession_DevJump_ScalesPartyAndGearWithoutCountingRun()
+    {
+        GameSession session = new(new GameWorld(1, 12345));
+        int runsBefore = session.StateManager.Campaign.RunsCompleted;
+
+        session.ToggleDevMenu();
+        session.AdjustDevFloor(9);
+        Assert.Equal(10, session.DevSelectedFloor);
+        Assert.Equal(10, session.DevPartyLevel);
+
+        session.JumpToDevFloor();
+
+        Assert.Equal(GameState.Exploration, session.State);
+        Assert.Equal(10, session.StateManager.ActiveExpedition.CurrentFloor);
+        Assert.Equal(runsBefore, session.StateManager.Campaign.RunsCompleted);
+        Assert.Equal(4, session.StateManager.ActiveExpedition.Party.Count);
+
+        foreach (PartyMember member in session.StateManager.ActiveExpedition.Party)
+        {
+            Assert.Equal(10, member.Level);
+            Assert.Equal(100, member.Morale);
+            Assert.Equal(3, member.EquippedGearIds.Count);
+
+            foreach (string gearId in member.EquippedGearIds)
+            {
+                Gear gear = session.StateManager.Campaign.Gear.Single(candidate => candidate.Id == gearId);
+                Assert.StartsWith("dev-10-", gear.Id);
+                Assert.True(gear.Power > 0);
+            }
+        }
+
+        Assert.False(session.DevMenuOpen);
+    }
+
+    [Fact]
     public void Tile_DefaultMetadata_DistinguishesRaisedStructures()
     {
         Tile wall = new(TileType.Wall, false, true);
