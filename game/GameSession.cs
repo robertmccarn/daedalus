@@ -3,6 +3,7 @@ using Systemic.Engine.State;
 public class GameSession
 {
     private readonly GameLogic logic;
+    private FeedbackEffect? feedback;
 
     public GameWorld World { get; }
     public PartyController Party { get; }
@@ -11,6 +12,8 @@ public class GameSession
     public string Message { get; private set; }
     public GameStateManager StateManager { get; }
     public ExtractionSummary? LastExtraction { get; private set; }
+    public FeedbackEffect? Feedback => feedback;
+
     public string CurrentObjective =>
         StateManager.ActiveExpedition.CurrentFloor <= 1
             ? "Reach the extraction point with something worth bringing back."
@@ -24,7 +27,6 @@ public class GameSession
         Message = string.Empty;
         StateManager = new GameStateManager();
         Party = new PartyController(World);
-
         StartNewExpeditionInternal();
     }
 
@@ -58,6 +60,7 @@ public class GameSession
             RecordNodeVisit(position.X, position.Y);
             SynchronizeExpedition();
             UpdateVisibility();
+            SetFeedback(FeedbackEffectType.Discovery, position);
 
             if (StateManager.ActiveExpedition.TurnCount % 12 == 0)
                 TriggerExplorationEvent();
@@ -91,6 +94,13 @@ public class GameSession
         Message = $"{expeditionEvent.Title}: {expeditionEvent.Description}";
         if (expeditionEvent.GoldDelta != 0)
             Message += $" +{expeditionEvent.GoldDelta} carried gold.";
+
+        SetFeedback(
+            expeditionEvent.MoraleDelta < 0
+                ? FeedbackEffectType.Danger
+                : FeedbackEffectType.Discovery,
+            Party.LeaderPosition);
+
         SynchronizeExpedition();
     }
 
@@ -112,6 +122,7 @@ public class GameSession
                 MoraleSystem.ApplyEvent(StateManager.ActiveExpedition, MoraleEventType.LootFound);
                 CompleteNode(chest.X, chest.Y);
                 Message += " Supplies recovered.";
+                SetFeedback(FeedbackEffectType.Loot, leaderPosition);
             }
             RecordNodeVisit(chest.X, chest.Y);
             return;
@@ -130,6 +141,7 @@ public class GameSession
                 SynchronizeExpedition();
                 CompleteNode(terminal.X, terminal.Y);
                 Message += $" Restored {terminal.HealAmount} HP.";
+                SetFeedback(FeedbackEffectType.Heal, leaderPosition);
             }
             RecordNodeVisit(terminal.X, terminal.Y);
             return;
@@ -192,6 +204,7 @@ public class GameSession
             ApplyGearBonuses();
             SynchronizeExpedition();
             UpdateVisibility();
+            SetFeedback(FeedbackEffectType.Victory, Party.LeaderPosition);
             return;
         }
 
@@ -202,6 +215,7 @@ public class GameSession
             StateManager.ActiveExpedition.ExtractionState = "Defeated";
             Party.GetLeaderRuntime().IsDefeated = true;
             SynchronizeExpedition();
+            SetFeedback(FeedbackEffectType.Danger, Party.LeaderPosition);
             return;
         }
 
@@ -213,7 +227,7 @@ public class GameSession
         }
 
         if (enemyDamage > 0)
-            Message = $"{Battle.CommandMessage} Enemy pressure: {enemyDamage} damage.";
+            SetFeedback(FeedbackEffectType.Damage, Party.LeaderPosition);
     }
 
     public void DiscoverCell(int x, int y) => StateManager.DiscoverArea(x, y);
@@ -236,6 +250,7 @@ public class GameSession
         Battle = null;
         Message = "Expedition loaded.";
         UpdateVisibility();
+        feedback = null;
         return true;
     }
 
@@ -275,6 +290,7 @@ public class GameSession
         Message = $"Expedition extracted at depth {depth}. Upkeep settled: {upkeep}.";
         State = GameState.ExtractionResults;
         Battle = null;
+        SetFeedback(FeedbackEffectType.Extraction, Party.LeaderPosition);
         return true;
     }
 
@@ -324,6 +340,7 @@ public class GameSession
 
         State = GameState.Exploration;
         Battle = null;
+        feedback = null;
         Message = "The expedition enters the ruins.";
     }
 
@@ -342,13 +359,13 @@ public class GameSession
         Battle = new BattleSystem(StateManager.ActiveExpedition, battleEnemies);
         State = GameState.Battle;
         Message = Battle.CommandMessage;
+        SetFeedback(FeedbackEffectType.Danger, new GridPosition(enemy.X, enemy.Y));
     }
 
     private void EndBattle()
     {
         State = GameState.Exploration;
         Battle = null;
-        Message = string.Empty;
         SyncCompatibilityPlayer();
         UpdateVisibility();
     }
@@ -366,6 +383,7 @@ public class GameSession
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
         UpdateVisibility();
+        SetFeedback(FeedbackEffectType.Discovery, Party.LeaderPosition);
     }
 
     private void CompleteNode(int x, int y)
@@ -413,6 +431,9 @@ public class GameSession
             if (VisibilitySystem.IsVisible(World, leader, new GridPosition(x, y), radius))
                 StateManager.MarkDiscovered(x, y);
     }
+
+    private void SetFeedback(FeedbackEffectType type, GridPosition position, int durationMs = 900) =>
+        feedback = new FeedbackEffect(type, position.X, position.Y, Environment.TickCount64, durationMs);
 
     private void SyncCompatibilityPlayer()
     {
