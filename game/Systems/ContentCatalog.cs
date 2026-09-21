@@ -28,7 +28,7 @@ public static class ContentCatalog
             },
             new Recipe
             {
-                Id = "scout-ring",
+                Id = "resonant-scout-ring",
                 Name = "Resonant Scout Ring",
                 Ingredients = new() { "crystal-shard", "monster-residue" },
                 IngredientQuantities = new() { ["crystal-shard"] = 1, ["monster-residue"] = 1 },
@@ -37,4 +37,24 @@ public static class ContentCatalog
                 ResultPower = 3
             }
         };
+
+    public static void InitializeCampaign(CampaignState campaign)
+    {
+        foreach (Gear gear in StarterGear)
+            if (campaign.Gear.All(existing => existing.Id != gear.Id))
+                campaign.Gear.Add(new Gear { Id = gear.Id, Name = gear.Name, Slot = gear.Slot, Power = gear.Power });
+
+        foreach (Recipe recipe in AdditionalRecipes)
+            if (campaign.Recipes.All(existing => existing.Id != recipe.Id))
+                campaign.Recipes.Add(new Recipe
+                {
+                    Id = recipe.Id,
+                    Name = recipe.Name,
+                    Ingredients = new List<string>(recipe.Ingredients),
+                    IngredientQuantities = new Dictionary<string, int>(recipe.IngredientQuantities),
+                    ResultKind = recipe.ResultKind,
+                    ResultSlot = recipe.ResultSlot,
+                    ResultPower = recipe.ResultPower
+                });
+    }
 }
