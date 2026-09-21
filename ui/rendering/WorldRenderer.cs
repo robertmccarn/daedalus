@@ -6,6 +6,7 @@ public sealed class WorldRenderer
     {
         GameWorld world = context.World;
         WorldPresentationProfile p = context.Profile;
+        long now = AnimationClock.Now;
         GridPosition leader = context.Party.LeaderPosition;
         int radiusX = 18;
         int radiusY = 12;
@@ -61,12 +62,12 @@ public sealed class WorldRenderer
 
             case TileType.StairsDown:
                 DrawFloor(g, r, p, x, y);
-                DrawStairs(g, r, p.Accent);
+                DrawStairs(g, r, p.Accent, now);
                 return;
 
             case TileType.StairsUp:
                 DrawFloor(g, r, p, x, y);
-                DrawStairs(g, r, p.WarmLight);
+                DrawStairs(g, r, p.WarmLight, now);
                 return;
 
             case TileType.Door:
@@ -76,7 +77,7 @@ public sealed class WorldRenderer
 
             case TileType.Water:
                 DrawFloor(g, r, p, x, y);
-                DrawWater(g, r, p, x, y);
+                DrawWater(g, r, p, x, y, now);
                 return;
 
             default:
@@ -174,12 +175,17 @@ public sealed class WorldRenderer
         }
     }
 
-    private static void DrawStairs(Graphics g, Rectangle r, Color accent)
+    private static void DrawStairs(Graphics g, Rectangle r, Color accent, long now)
     {
         using Brush dark = new SolidBrush(Color.FromArgb(90, 0, 0, 0));
         g.FillRectangle(dark, r.X + 4, r.Y + 5, r.Width - 8, r.Height - 8);
 
-        using Brush glow = new SolidBrush(Color.FromArgb(55, accent.R, accent.G, accent.B));
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 1400, r.X + r.Y);
+        using Brush glow = new SolidBrush(Color.FromArgb(
+            42 + (int)(28 * pulse),
+            accent.R,
+            accent.G,
+            accent.B));
         g.FillRectangle(glow, r.X + 5, r.Y + 6, r.Width - 10, r.Height - 10);
 
         using Pen step = new(Color.FromArgb(190, accent.R, accent.G, accent.B), 1);
@@ -204,17 +210,28 @@ public sealed class WorldRenderer
         g.DrawLine(inner, r.X + 10, r.Bottom - 6, r.Right - 11, r.Bottom - 6);
     }
 
-    private static void DrawWater(Graphics g, Rectangle r, WorldPresentationProfile p, int x, int y)
+    private static void DrawWater(
+        Graphics g,
+        Rectangle r,
+        WorldPresentationProfile p,
+        int x,
+        int y,
+        long now)
     {
         using Brush water = new SolidBrush(Color.FromArgb(55, 85, 91));
         g.FillRectangle(water, r.X, r.Y, r.Width, r.Height);
 
-        using Pen ripples = new(Color.FromArgb(80, p.Accent.R, p.Accent.G, p.Accent.B), 1);
+        using Pen ripples = new(
+            Color.FromArgb(55 + (int)(30 * AnimationClock.PingPong(now, 1100, x * 17 + y * 31)), p.Accent.R, p.Accent.G, p.Accent.B),
+            1);
+
         int pattern = PositiveMod(x * 31 + y * 17, 3);
+        int drift = (int)MathF.Round(AnimationClock.Sine(now, 1250, x * 43 + y * 7) * 2f);
+
         for (int i = 0; i < 2; i++)
         {
             int yy = r.Y + 9 + (i + pattern) * 7;
-            g.DrawLine(ripples, r.X + 5, yy, r.Right - 5, yy - 1);
+            g.DrawLine(ripples, r.X + 5 + drift, yy, r.Right - 5 + drift, yy - 1);
         }
     }
 
