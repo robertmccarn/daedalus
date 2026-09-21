@@ -130,7 +130,7 @@ public class Phase5To9Tests
         battle.SelectNextCommand(); // Skill
         battle.PerformPlayerTurn(out _, out _);
         Assert.Equal("arden", battle.SelectedActor?.Id);
-        Assert.True(battle.HasStatus(enemyA, "Exposed"));
+        Assert.True(battle.HasStatus(enemyB, "Exposed"));
     }
 
     [Fact]
@@ -207,8 +207,8 @@ public class Phase5To9Tests
             {
                 new PartyMember
                 {
-                    Id = "lyra",
-                    Name = "Lyra",
+                    Id = "arden",
+                    Name = "Arden",
                     HP = 50,
                     MaxHP = 50,
                     MP = 10,
@@ -304,8 +304,8 @@ public class Phase5To9Tests
             {
                 new PartyMember
                 {
-                    Id = "arden",
-                    Name = "Arden",
+                    Id = "lyra",
+                    Name = "Lyra",
                     HP = 40,
                     MaxHP = 40,
                     MP = 10,
