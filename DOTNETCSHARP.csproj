@@ -6,8 +6,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <BaseIntermediateOutputPath>obj\game\</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin\game\</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
