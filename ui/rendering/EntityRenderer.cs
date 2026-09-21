@@ -41,11 +41,24 @@ public sealed class EntityRenderer
 
     private static void DrawPartyMember(Graphics g, ExplorationRenderContext c, PartyRenderData member)
     {
-        Point s = c.ToScreen(member.Position);
+        Point current = c.ToScreen(member.Position);
+        Point previous = c.ToScreen(member.PreviousPosition);
+
+        float moveT = member.AnimationState == CharacterAnimationState.Walk
+            ? Math.Clamp(member.AnimationTick / 3f, 0f, 1f)
+            : 1f;
+        moveT = AnimationClock.EaseInOutSine(moveT);
+
+        int x = AnimationClock.Lerp(previous.X, current.X, moveT);
+        int y = AnimationClock.Lerp(previous.Y, current.Y, moveT);
+
+        float idleWave = member.AnimationState == CharacterAnimationState.Idle
+            ? AnimationClock.Sine(AnimationClock.Now, 1400 + member.PartySlot * 120, member.PartySlot * 190)
+            : 0f;
+        int idleBob = (int)MathF.Round(idleWave * 1.25f);
+
         int lift = GetElevation(c, member.Position.X, member.Position.Y) * 4;
-        int bob = member.AnimationState == CharacterAnimationState.Walk &&
-                  member.AnimationTick % 2 == 1 ? -2 : 0;
-        Point origin = new(s.X, s.Y + bob - lift);
+        Point origin = new(x, y + idleBob - lift);
 
         Color accent = member.IsLeader
             ? c.Profile.Accent
@@ -58,7 +71,8 @@ public sealed class EntityRenderer
             };
 
         using Brush shadow = new SolidBrush(Color.FromArgb(105, 0, 0, 0));
-        g.FillEllipse(shadow, origin.X + 2, origin.Y + 21 + lift, 25, 7);
+        int shadowY = AnimationClock.Lerp(previous.Y, current.Y, moveT) + 21;
+        g.FillEllipse(shadow, x + 2, shadowY, 25, 7);
 
         switch (member.SpriteId.ToLowerInvariant())
         {
@@ -78,8 +92,12 @@ public sealed class EntityRenderer
 
         if (member.IsLeader)
         {
-            using Pen marker = new(Color.FromArgb(205, c.Profile.Accent.R, c.Profile.Accent.G, c.Profile.Accent.B), 2);
-            g.DrawEllipse(marker, origin.X + 1, origin.Y - 1, 27, 28);
+            float markerPulse = 0.75f + 0.25f * AnimationClock.PingPong(AnimationClock.Now, 900, 175);
+            int alpha = (int)(150 + 90 * markerPulse);
+            int pad = (int)MathF.Round(1 + markerPulse);
+
+            using Pen marker = new(Color.FromArgb(alpha, c.Profile.Accent.R, c.Profile.Accent.G, c.Profile.Accent.B), 2);
+            g.DrawEllipse(marker, origin.X + 1 - pad, origin.Y - 1 - pad, 27 + pad * 2, 28 + pad * 2);
         }
     }
 
