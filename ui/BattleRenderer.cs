@@ -1,507 +1,176 @@
-﻿using System.Drawing;
-
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using Systemic.Engine.State;
 
 public class BattleRenderer : IDisposable
 {
-    private readonly Font titleFont;
-    private readonly Font uiFont;
-    private readonly BattleMenuRenderer menuRenderer;
-
-    private const int FrameX = 30;
-    private const int FrameY = 30;
-    private const int FrameWidth = 1040;
-    private const int FrameHeight = 580;
-
-    private const int TitleX = 60;
-    private const int TitleY = 55;
-
-    private const int PlayerX = 80;
-    private const int EnemyX = 700;
-
-    private const int NameY = 140;
-    private const int HpY = 175;
-
-    private const int PlayerSpriteX = 150;
-    private const int PlayerSpriteY = 235;
-
-    private const int EnemySpriteX = 760;
-    private const int EnemySpriteY = 235;
-
-    private const int CommandX = 60;
-    private const int CommandY = 430;
-
-    private const int MessageX = 550;
-    private const int MessageY = 430;
-
-    private const int BarWidth = 250;
-    private const int BarHeight = 18;
-
-
-    public BattleRenderer()
-    {
-        titleFont =
-            new Font(
-                FontFamily.GenericMonospace,
-                26);
-
-        uiFont =
-            new Font(
-                FontFamily.GenericMonospace,
-                16);
-
-        menuRenderer = new BattleMenuRenderer();
-    }
-
+    private readonly Font titleFont = new(FontFamily.GenericMonospace, 26, FontStyle.Bold);
+    private readonly Font uiFont = new(FontFamily.GenericMonospace, 14);
+    private readonly Font smallFont = new(FontFamily.GenericMonospace, 11);
 
     public void Draw(
         Graphics graphics,
         GameWorld world,
+        PartyController party,
+        ExpeditionState expedition,
         Character? enemy,
         string message,
         BattleCommand selectedCommand)
     {
-        graphics.Clear(
-            Color.Black);
+        BiomeType biome = BiomeCatalog.ForFloor(world.Floor);
+        WorldPresentationProfile p = WorldPresentationProfile.ForBiome(biome);
+        graphics.Clear(Color.FromArgb(10, 12, 15));
 
-        DrawBattleFrame(
-            graphics);
+        using LinearGradientBrush bg = new(
+            new Rectangle(0, 0, 1100, 700),
+            p.Void,
+            Color.FromArgb(42, 34, 35),
+            LinearGradientMode.Vertical);
+        graphics.FillRectangle(bg, 0, 0, 1100, 700);
 
-        DrawTitle(
-            graphics);
+        DrawArena(graphics, p);
+        graphics.DrawString("TACTICAL CONTACT", titleFont, Brushes.White, 45, 30);
+        graphics.DrawString(BiomeCatalog.Name(biome), smallFont, new SolidBrush(p.Accent), 48, 65);
 
-        if (enemy == null)
+        DrawEnemies(graphics, p, world, enemy);
+        DrawParty(graphics, p, expedition, party);
+
+        DrawCommands(graphics, p, selectedCommand);
+        DrawDescription(graphics, p, message);
+        DrawEnemyTracker(graphics, p, world, enemy);
+    }
+
+    private static void DrawArena(Graphics g, WorldPresentationProfile p)
+    {
+        using Pen grid = new(Color.FromArgb(35, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
+        for (int x = 60; x <= 810; x += 38)
+            g.DrawLine(grid, x, 110, x, 470);
+        for (int y = 110; y <= 470; y += 38)
+            g.DrawLine(grid, 60, y, 810, y);
+
+        using Brush floor = new SolidBrush(Color.FromArgb(80, p.Floor.R, p.Floor.G, p.Floor.B));
+        g.FillRectangle(floor, 60, 110, 750, 360);
+        using Pen border = new(Color.FromArgb(160, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 2);
+        g.DrawRectangle(border, 60, 110, 750, 360);
+    }
+
+    private static void DrawParty(
+        Graphics g,
+        WorldPresentationProfile p,
+        ExpeditionState expedition,
+        PartyController party)
+    {
+        int index = 0;
+        foreach (PartyMember member in expedition.Party.Take(4))
         {
-            return;
+            int x = 150 + (index % 2) * 120;
+            int y = 190 + (index / 2) * 120;
+            bool leader = member.Id == party.LeaderId;
+            Color c = leader ? p.Accent : Color.FromArgb(150 + index * 20, 170, 180);
+
+            using Brush shadow = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
+            g.FillEllipse(shadow, x - 2, y + 45, 56, 14);
+            using Brush body = new SolidBrush(c);
+            g.FillEllipse(body, x, y, 52, 52);
+            using Brush face = new SolidBrush(Color.FromArgb(195, 165, 145));
+            g.FillEllipse(face, x + 14, y - 10, 24, 24);
+
+            g.DrawString(member.Name, new Font(FontFamily.GenericMonospace, 10), Brushes.White, x - 6, y + 62);
+            g.DrawString($"{member.HP}/{member.MaxHP}", new Font(FontFamily.GenericMonospace, 9), Brushes.Gainsboro, x - 6, y + 77);
+
+            if (leader)
+            {
+                using Pen marker = new(p.Accent, 2);
+                g.DrawEllipse(marker, x - 5, y - 5, 62, 62);
+            }
+            index++;
         }
 
-        DrawCombatantInfo(
-            graphics,
-            world.Player,
-            PlayerX,
-            Brushes.White);
-
-        DrawCombatantInfo(
-            graphics,
-            enemy,
-            EnemyX,
-            Brushes.Red);
-
-        DrawPlayerSprite(
-            graphics);
-
-        DrawGoblinSprite(
-            graphics);
-
-        menuRenderer.DrawCommands(graphics, selectedCommand);
-
-        DrawMessage(
-            graphics,
-            message);
+        g.DrawString("PARTY", new Font(FontFamily.GenericMonospace, 11, FontStyle.Bold), Brushes.White, 115, 145);
     }
 
-
-    private void DrawBattleFrame(
-        Graphics graphics)
+    private static void DrawEnemies(
+        Graphics g,
+        WorldPresentationProfile p,
+        GameWorld world,
+        Character? currentEnemy)
     {
-        graphics.DrawRectangle(
-            Pens.White,
-            FrameX,
-            FrameY,
-            FrameWidth,
-            FrameHeight);
-    }
+        List<Character> enemies = world.Enemies
+            .Where(e => currentEnemy == null || e == currentEnemy || world.Enemies.Contains(e))
+            .Take(4)
+            .ToList();
 
-
-    private void DrawTitle(
-        Graphics graphics)
-    {
-        graphics.DrawString(
-            "BATTLE",
-            titleFont,
-            Brushes.White,
-            TitleX,
-            TitleY);
-    }
-
-
-    private void DrawCombatantInfo(
-        Graphics graphics,
-        Character character,
-        int x,
-        Brush nameBrush)
-    {
-        graphics.DrawString(
-            character.Name,
-            uiFont,
-            nameBrush,
-            x,
-            NameY);
-
-        graphics.DrawString(
-            $"HP {character.HP}/{character.MAXHP}",
-            uiFont,
-            Brushes.White,
-            x,
-            HpY);
-
-        DrawHpBar(
-            graphics,
-            character,
-            x,
-            HpY + 28);
-
-        menuRenderer.DrawStatusBadges(graphics, character, x, HpY + 52);
-    }
-
-
-    private void DrawHpBar(
-        Graphics graphics,
-        Character character,
-        int x,
-        int y)
-    {
-        graphics.DrawRectangle(
-            Pens.White,
-            x,
-            y,
-            BarWidth,
-            BarHeight);
-
-        if (character.MAXHP <= 0)
+        for (int i = 0; i < enemies.Count; i++)
         {
-            return;
-        }
+            int x = 540 + (i % 2) * 125;
+            int y = 190 + (i / 2) * 120;
+            Character enemy = enemies[i];
 
-        float percentage =
-            (float)character.HP /
-            character.MAXHP;
+            using Brush shadow = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
+            g.FillEllipse(shadow, x - 2, y + 45, 56, 14);
+            using Brush body = new SolidBrush(p.Hazard);
+            g.FillEllipse(body, x, y, 52, 52);
+            using Brush eye = new SolidBrush(Color.FromArgb(238, 220, 190));
+            g.FillEllipse(eye, x + 13, y + 19, 7, 7);
+            g.FillEllipse(eye, x + 32, y + 19, 7, 7);
 
-        int fillWidth =
-            (int)(
-                (BarWidth - 2) *
-                percentage);
-
-        if (fillWidth <= 0)
-        {
-            return;
-        }
-
-        graphics.FillRectangle(
-            Brushes.LimeGreen,
-            x + 1,
-            y + 1,
-            fillWidth,
-            BarHeight - 2);
-    }
-
-
-    private void DrawPlayerSprite(
-        Graphics graphics)
-    {
-        int x =
-            PlayerSpriteX;
-
-        int y =
-            PlayerSpriteY;
-
-        // Shadow
-
-        graphics.FillRectangle(
-            Brushes.DarkGray,
-            x,
-            y + 135,
-            110,
-            12);
-
-        // Cape
-
-        graphics.FillRectangle(
-            Brushes.DarkBlue,
-            x + 20,
-            y + 50,
-            55,
-            80);
-
-        // Body armor
-
-        graphics.FillRectangle(
-            Brushes.SteelBlue,
-            x + 35,
-            y + 55,
-            45,
-            65);
-
-        // Head
-
-        graphics.FillRectangle(
-            Brushes.PeachPuff,
-            x + 42,
-            y + 15,
-            35,
-            40);
-
-        // Hair
-
-        graphics.FillRectangle(
-            Brushes.MidnightBlue,
-            x + 38,
-            y + 10,
-            43,
-            15);
-
-        // Legs
-
-        graphics.FillRectangle(
-            Brushes.SaddleBrown,
-            x + 35,
-            y + 115,
-            15,
-            25);
-
-        graphics.FillRectangle(
-            Brushes.SaddleBrown,
-            x + 65,
-            y + 115,
-            15,
-            25);
-
-        // Sword
-
-        using Pen sword =
-            new Pen(
-                Brushes.LightGray,
-                8);
-
-        graphics.DrawLine(
-            sword,
-            x + 80,
-            y + 75,
-            x + 125,
-            y + 30);
-    }
-
-
-    private void DrawGoblinSprite(
-        Graphics graphics)
-    {
-        int x =
-            EnemySpriteX;
-
-        int y =
-            EnemySpriteY;
-
-        // Shadow
-
-        graphics.FillRectangle(
-            Brushes.DarkGray,
-            x,
-            y + 135,
-            110,
-            12);
-
-        // Body
-
-        graphics.FillRectangle(
-            Brushes.DarkGreen,
-            x + 30,
-            y + 60,
-            50,
-            65);
-
-        // Head
-
-        graphics.FillRectangle(
-            Brushes.YellowGreen,
-            x + 25,
-            y + 20,
-            60,
-            50);
-
-        // Ears
-
-        graphics.FillRectangle(
-            Brushes.YellowGreen,
-            x + 10,
-            y + 30,
-            20,
-            20);
-
-        graphics.FillRectangle(
-            Brushes.YellowGreen,
-            x + 80,
-            y + 30,
-            20,
-            20);
-
-        // Eyes
-
-        graphics.FillRectangle(
-            Brushes.Red,
-            x + 40,
-            y + 38,
-            8,
-            8);
-
-        graphics.FillRectangle(
-            Brushes.Red,
-            x + 63,
-            y + 38,
-            8,
-            8);
-
-        // Arms
-
-        graphics.FillRectangle(
-            Brushes.DarkGreen,
-            x + 10,
-            y + 70,
-            25,
-            15);
-
-        graphics.FillRectangle(
-            Brushes.DarkGreen,
-            x + 80,
-            y + 70,
-            25,
-            15);
-
-        // Legs
-
-        graphics.FillRectangle(
-            Brushes.DarkGreen,
-            x + 35,
-            y + 120,
-            15,
-            25);
-
-        graphics.FillRectangle(
-            Brushes.DarkGreen,
-            x + 65,
-            y + 120,
-            15,
-            25);
-
-        // Club
-
-        using Pen club =
-            new Pen(
-                Brushes.SaddleBrown,
-                10);
-
-        graphics.DrawLine(
-            club,
-            x + 95,
-            y + 90,
-            x + 130,
-            y + 125);
-    }
-
-
-    private void DrawCommands(
-        Graphics graphics,
-        BattleCommand selectedCommand)
-    {
-        graphics.DrawRectangle(
-            Pens.White,
-            45,
-            405,
-            400,
-            175);
-
-        BattleCommand[] commands =
-        {
-            BattleCommand.Attack,
-            BattleCommand.Skill,
-            BattleCommand.Item,
-            BattleCommand.Defend,
-            BattleCommand.Run
-        };
-
-        foreach (BattleCommand command
-            in commands)
-        {
-            int index =
-                (int)command;
-
-            int y =
-                CommandY +
-                index * 28;
-
-            string prefix =
-                command == selectedCommand
-                    ? "▶ "
-                    : "  ";
-
-            Brush brush =
-                command == BattleCommand.Attack
-                    ? Brushes.White
-                    : Brushes.Gray;
-
-            graphics.DrawString(
-                prefix + command,
-                uiFont,
-                brush,
-                CommandX,
-                y);
+            g.DrawString(enemy.Name, new Font(FontFamily.GenericMonospace, 10), Brushes.White, x - 10, y + 62);
+            g.DrawString($"{enemy.HP}/{enemy.MAXHP}", new Font(FontFamily.GenericMonospace, 9), Brushes.Gainsboro, x - 10, y + 77);
         }
     }
 
-
-    private void DrawMessage(
-        Graphics graphics,
-        string message)
+    private static void DrawCommands(Graphics g, WorldPresentationProfile p, BattleCommand selected)
     {
-        const int boxX = 465;
-        const int boxY = 405;
-        const int boxWidth = 565;
-        const int boxHeight = 175;
+        using Brush panel = new SolidBrush(Color.FromArgb(230, 13, 16, 20));
+        g.FillRectangle(panel, 35, 500, 340, 155);
+        using Pen border = new(p.WallHighlight, 1);
+        g.DrawRectangle(border, 35, 500, 340, 155);
 
-        const int padding = 18;
-
-        graphics.DrawRectangle(
-            Pens.White,
-            boxX,
-            boxY,
-            boxWidth,
-            boxHeight);
-
-        string displayMessage =
-            string.IsNullOrWhiteSpace(message)
-                ? "Choose an action."
-                : message;
-
-        RectangleF textArea =
-            new RectangleF(
-                boxX + padding,
-                boxY + padding,
-                boxWidth - padding * 2,
-                boxHeight - padding * 2);
-
-        using StringFormat format =
-            new StringFormat();
-
-        format.Alignment =
-            StringAlignment.Near;
-
-        format.LineAlignment =
-            StringAlignment.Near;
-
-        format.Trimming =
-            StringTrimming.None;
-
-        graphics.DrawString(
-            displayMessage,
-            uiFont,
-            Brushes.White,
-            textArea,
-            format);
+        BattleCommand[] commands = { BattleCommand.Attack, BattleCommand.Skill, BattleCommand.Item, BattleCommand.Defend, BattleCommand.Run };
+        for (int i = 0; i < commands.Length; i++)
+        {
+            Color c = commands[i] == selected ? p.Accent : Color.FromArgb(190, 200, 200, 205);
+            string prefix = commands[i] == selected ? "▶ " : "  ";
+            g.DrawString(prefix + commands[i].ToString().ToUpperInvariant(), new Font(FontFamily.GenericMonospace, 13), new SolidBrush(c), 55, 515 + i * 25);
+        }
     }
 
+    private static void DrawDescription(Graphics g, WorldPresentationProfile p, string message)
+    {
+        using Brush panel = new SolidBrush(Color.FromArgb(230, 13, 16, 20));
+        g.FillRectangle(panel, 395, 500, 415, 155);
+        using Pen border = new(p.WallHighlight, 1);
+        g.DrawRectangle(border, 395, 500, 415, 155);
+
+        g.DrawString("ACTION", new Font(FontFamily.GenericMonospace, 11, FontStyle.Bold), new SolidBrush(p.Accent), 415, 515);
+        string text = string.IsNullOrWhiteSpace(message) ? "Choose an action." : message;
+        g.DrawString(text, new Font(FontFamily.GenericMonospace, 12), Brushes.White,
+            new RectangleF(415, 545, 375, 90));
+    }
+
+    private static void DrawEnemyTracker(Graphics g, WorldPresentationProfile p, GameWorld world, Character? current)
+    {
+        using Brush panel = new SolidBrush(Color.FromArgb(220, 12, 15, 18));
+        g.FillRectangle(panel, 835, 95, 240, 370);
+        using Pen border = new(p.WallHighlight, 1);
+        g.DrawRectangle(border, 835, 95, 240, 370);
+        g.DrawString("HOSTILE CONTACTS", new Font(FontFamily.GenericMonospace, 11, FontStyle.Bold), Brushes.White, 850, 112);
+
+        int y = 145;
+        foreach (Character enemy in world.Enemies.Take(6))
+        {
+            bool selected = enemy == current;
+            g.DrawString(selected ? "◆" : "◇", new Font(FontFamily.GenericMonospace, 11), new SolidBrush(selected ? p.Hazard : Color.Gray), 850, y);
+            g.DrawString(enemy.Name, new Font(FontFamily.GenericMonospace, 10), Brushes.White, 870, y);
+            g.DrawString($"HP {enemy.HP}/{enemy.MAXHP}", new Font(FontFamily.GenericMonospace, 9), Brushes.Gainsboro, 870, y + 18);
+            y += 48;
+        }
+    }
 
     public void Dispose()
     {
         titleFont.Dispose();
         uiFont.Dispose();
-        menuRenderer.Dispose();
+        smallFont.Dispose();
     }
 }
