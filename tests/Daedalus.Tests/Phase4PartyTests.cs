@@ -249,6 +249,103 @@ public class Phase4PartyTests
         Assert.Equal(party.Members.Count, party.Members.Select(member => member.Position).Distinct().Count());
     }
 
+
+    [Fact]
+    public void PartyController_NonFirstLeader_RemainsLeaderAndFollowersRemainUnique()
+    {
+        GameWorld world = new(seed: 2468);
+        GameStateManager manager = new();
+        manager.StartNewExpedition(
+            world.SpawnX,
+            world.SpawnY,
+            30,
+            30,
+            floorSeed: world.FloorSeed,
+            selectedMemberIds: ["arden", "lyra", "marek", "sera"],
+            leaderId: "sera",
+            formation: PartyFormationType.Column);
+
+        PartyController party = new(world);
+        party.Initialize(
+            manager.ActiveExpedition,
+            new GridPosition(world.SpawnX, world.SpawnY));
+
+        AssertValidParty(party, world, 4, "sera");
+
+        (int dx, int dy, CharacterDirection direction) = FindWalkableDirection(world, party.LeaderPosition);
+        Assert.Equal(MoveResult.Moved, party.TryMoveLeader(direction, manager.ActiveExpedition));
+        AssertValidParty(party, world, 4, "sera");
+        Assert.Equal("sera", party.GetLeaderRuntime().MemberId);
+    }
+
+    [Fact]
+    public void PartyController_AllFormations_SupportNonFirstLeader()
+    {
+        foreach (PartyFormationType formation in Enum.GetValues<PartyFormationType>())
+        {
+            GameWorld world = new(seed: 1357);
+            GameStateManager manager = new();
+            manager.StartNewExpedition(
+                world.SpawnX,
+                world.SpawnY,
+                30,
+                30,
+                floorSeed: world.FloorSeed,
+                selectedMemberIds: ["arden", "lyra", "marek", "sera"],
+                leaderId: "sera",
+                formation: formation);
+
+            PartyController party = new(world);
+            party.Initialize(
+                manager.ActiveExpedition,
+                new GridPosition(world.SpawnX, world.SpawnY));
+
+            Assert.Equal(formation, party.Formation);
+            AssertValidParty(party, world, 4, "sera");
+        }
+    }
+
+    [Fact]
+    public void FloorReform_NonFirstLeader_RemainsLeader()
+    {
+        GameWorld world = new(seed: 9753);
+        GameStateManager manager = new();
+        manager.StartNewExpedition(
+            world.SpawnX,
+            world.SpawnY,
+            30,
+            30,
+            floorSeed: world.FloorSeed,
+            selectedMemberIds: ["arden", "lyra", "marek", "sera"],
+            leaderId: "sera",
+            formation: PartyFormationType.Defensive);
+
+        PartyController party = new(world);
+        party.Initialize(manager.ActiveExpedition, new GridPosition(world.SpawnX, world.SpawnY));
+
+        manager.AdvanceFloor(30, 30);
+        world.RebuildFloor(manager.ActiveExpedition.FloorSeed, manager.ActiveExpedition.CurrentFloor);
+        party.ReformForFloor(manager.ActiveExpedition, new GridPosition(world.SpawnX, world.SpawnY));
+
+        AssertValidParty(party, world, 4, "sera");
+        Assert.Equal(new GridPosition(world.SpawnX, world.SpawnY), party.LeaderPosition);
+    }
+
+    private static void AssertValidParty(
+        PartyController party,
+        GameWorld world,
+        int expectedCount,
+        string expectedLeaderId)
+    {
+        Assert.Equal(expectedCount, party.Members.Count);
+        Assert.Equal(expectedLeaderId, party.LeaderId);
+        Assert.Single(party.Members, member => member.MemberId == expectedLeaderId);
+
+        List<GridPosition> positions = party.Members.Select(member => member.Position).ToList();
+        Assert.Equal(expectedCount, positions.Distinct().Count());
+        Assert.All(positions, position => Assert.True(world.IsWalkable(position.X, position.Y)));
+    }
+
     private static GameStateManager CreatePartyManager(GameWorld world)
     {
         GameStateManager manager = new();
