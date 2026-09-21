@@ -247,12 +247,6 @@ public sealed class BattleSystem
                 break;
 
             case BattleCommand.Run:
-                animationQueue.Enqueue(
-                    BattleAnimationKind.Defend,
-                    actor.Id,
-                    actor.Id,
-                    0,
-                    260);
                 IsFinished = true;
                 PlayerWon = false;
                 CurrentPhase = BattlePhase.Escaped;
