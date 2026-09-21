@@ -171,6 +171,132 @@ public class Phase5To9Tests
     }
 
     [Fact]
+    public void BattleSystem_UsesInterleavedInitiativeDuringRuntime()
+    {
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember { Id = "fast", Name = "Fast", HP = 100, MaxHP = 100, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 5, Agility = 12 } },
+                new PartyMember { Id = "slow", Name = "Slow", HP = 100, MaxHP = 100, MP = 10, MaxMP = 10, Stats = new StatsData { Strength = 5, Agility = 8 } }
+            }
+        };
+
+        Character enemyFast = new("Hollow Stalker", 60, 1, new Stats(3, 1, 10, 1), 10, 10);
+        Character enemySlow = new("Hollow Guard", 60, 1, new Stats(3, 1, 6, 1), 12, 10);
+
+        BattleSystem battle = new(expedition, new[] { enemyFast, enemySlow });
+
+        Assert.Equal("fast", battle.State.TurnOrder[0]);
+
+        battle.PerformPlayerTurn(out _, out int enemyDamage);
+
+        Assert.True(enemyDamage > 0);
+        Assert.Equal("slow", battle.SelectedActor?.Id);
+    }
+
+    [Fact]
+    public void BattleSystem_GearAndMoraleAffectPlayerDamage()
+    {
+        CampaignState campaign = new();
+        Gear weapon = new() { Id = "test-blade", Name = "Test Blade", Slot = "Weapon", Power = 7 };
+        campaign.Gear.Add(weapon);
+
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember
+                {
+                    Id = "arden",
+                    Name = "Arden",
+                    HP = 50,
+                    MaxHP = 50,
+                    MP = 10,
+                    MaxMP = 10,
+                    Morale = 100,
+                    EquippedGearIds = new() { weapon.Id },
+                    SpriteId = "arden",
+                    Stats = new StatsData { Strength = 8, Magic = 2, Agility = 12 }
+                }
+            }
+        };
+
+        Character enemy = new("Hollow Guard", 100, 1, new Stats(2, 1, 1, 1), 10, 10);
+        BattleSystem battle = new(expedition, new[] { enemy }, campaign);
+
+        battle.PerformPlayerTurn(out int damage, out _);
+
+        Assert.Equal(17, damage);
+        Assert.Equal(83, enemy.HP);
+    }
+
+    [Fact]
+    public void BattleSystem_PoisonDeathRegistersDefeat()
+    {
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember
+                {
+                    Id = "lyra",
+                    Name = "Lyra",
+                    HP = 100,
+                    MaxHP = 100,
+                    MP = 10,
+                    MaxMP = 10,
+                    SpriteId = "lyra",
+                    Stats = new StatsData { Strength = 1, Magic = 1, Agility = 12 }
+                }
+            }
+        };
+
+        Character enemy = new("Hollow Guard", 10, 1, new Stats(1, 1, 1, 1), 10, 10);
+        BattleSystem battle = new(expedition, new[] { enemy });
+
+        battle.SelectNextCommand();
+        Assert.Equal(BattleCommand.Skill, battle.SelectedCommand);
+
+        BattleResult result = battle.PerformPlayerTurn(out _, out _);
+
+        Assert.Equal(BattleResult.EnemyDefeated, result);
+        Assert.Contains(enemy, battle.DefeatedEnemies);
+        Assert.True(enemy.HP <= 0);
+    }
+
+    [Fact]
+    public void BattleSystem_RetargetsAfterSelectedEnemyDies()
+    {
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember
+                {
+                    Id = "arden",
+                    Name = "Arden",
+                    HP = 100,
+                    MaxHP = 100,
+                    MP = 10,
+                    MaxMP = 10,
+                    SpriteId = "arden",
+                    Stats = new StatsData { Strength = 20, Agility = 12 }
+                }
+            }
+        };
+
+        Character first = new("Hollow Guard", 15, 1, new Stats(1, 1, 1, 1), 10, 10);
+        Character second = new("Hollow Stalker", 100, 1, new Stats(1, 1, 1, 1), 12, 10);
+
+        BattleSystem battle = new(expedition, new[] { first, second });
+        BattleResult result = battle.PerformPlayerTurn(out _, out _);
+
+        Assert.Equal(BattleResult.Continue, result);
+        Assert.Same(second, battle.SelectedTarget);
+    }
+
+    [Fact]
     public void BattleSystem_SkillAppliesPoisonStatus()
     {
         ExpeditionState expedition = new()

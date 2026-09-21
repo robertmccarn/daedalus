@@ -9,6 +9,7 @@ public sealed class BattleState
     public string SelectedTargetId { get; set; } = string.Empty;
     public string Description { get; set; } = "Choose an action.";
     public int TurnIndex { get; set; }
+    public int Round { get; set; } = 1;
     public List<string> TurnOrder { get; set; } = new();
     public Dictionary<string, List<string>> StatusEffects { get; set; } = new();
 }
@@ -21,6 +22,7 @@ public sealed class BattleEnemyState
     public int MaxHP { get; set; }
     public int Agility { get; set; }
     public string Family { get; set; } = "Unknown";
+    public string Behavior { get; set; } = "Stalker";
 }
 
 public sealed class BattlePartyController
@@ -38,11 +40,12 @@ public sealed class BattlePartyController
         State.TurnOrder = State.Party
             .Select(member => (member.Id, Agility: member.Stats.Agility))
             .Concat(State.Enemies.Select(enemy => (enemy.Id, enemy.Agility)))
-            .OrderByDescending(x => x.Agility)
-            .ThenBy(x => x.Id, StringComparer.Ordinal)
-            .Select(x => x.Id)
+            .OrderByDescending(item => item.Agility)
+            .ThenBy(item => item.Id, StringComparer.Ordinal)
+            .Select(item => item.Id)
             .ToList();
 
+        State.TurnIndex = 0;
         State.SelectedActorId = State.TurnOrder.FirstOrDefault() ?? string.Empty;
     }
 
@@ -51,7 +54,8 @@ public sealed class BattlePartyController
         if (State.Enemies.Any(enemy => enemy.Id == enemyId))
         {
             State.SelectedTargetId = enemyId;
-            State.Description = $"Target: {State.Enemies.First(enemy => enemy.Id == enemyId).Name}.";
+            BattleEnemyState enemy = State.Enemies.First(candidate => candidate.Id == enemyId);
+            State.Description = $"Target: {enemy.Name}.";
         }
     }
 }

@@ -139,7 +139,9 @@ public class GameSession
                 RewardBundle terminalReward = new();
                 terminalReward.Cores.Add(terminal.CoreReward);
                 ExtractionSystem.ApplyReward(StateManager.Campaign, StateManager.ActiveExpedition, terminalReward);
-                World.Player.Heal(terminal.HealAmount);
+                PartyMember? leader = GetLeaderState();
+                if (leader != null)
+                    leader.HP = Math.Min(leader.MaxHP, leader.HP + terminal.HealAmount);
                 SynchronizeExpedition();
                 CompleteNode(terminal.X, terminal.Y);
                 Message += $" Restored {terminal.HealAmount} HP.";
@@ -367,7 +369,10 @@ public class GameSession
             .Take(3)
             .ToList();
 
-        Battle = new BattleSystem(StateManager.ActiveExpedition, battleEnemies);
+        Battle = new BattleSystem(
+            StateManager.ActiveExpedition,
+            battleEnemies,
+            StateManager.Campaign);
         State = GameState.Battle;
         Message = Battle.CommandMessage;
         SetFeedback(FeedbackEffectType.Danger, new GridPosition(enemy.X, enemy.Y));
@@ -425,15 +430,17 @@ public class GameSession
     {
         PartyMember? leader = GetLeaderState();
         if (leader == null) return;
+
+        SyncCompatibilityPlayer();
+
         StateManager.SynchronizeExpedition(
             Party.LeaderPosition.X,
             Party.LeaderPosition.Y,
-            World.Player.HP,
-            World.Player.MAXHP,
+            leader.HP,
+            leader.MaxHP,
             IsCellVisibleFromLeader);
-        leader.HP = World.Player.HP;
-        leader.MaxHP = World.Player.MAXHP;
-        leader.Level = World.Player.Level;
+
+        leader.Level = Math.Max(1, leader.Level);
     }
 
     private void UpdateVisibility()

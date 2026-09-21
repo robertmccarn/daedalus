@@ -21,11 +21,12 @@ public enum BattlePhase
 public sealed class BattleSystem
 {
     private readonly ExpeditionState expedition;
-    private readonly HashSet<string> defendingActors = new(StringComparer.Ordinal);
+    private readonly CampaignState? campaign;
     private readonly List<Character> defeatedEnemies = new();
     private readonly Dictionary<Character, string> enemyIds = new();
     private readonly Dictionary<string, int> poisonTurns = new(StringComparer.Ordinal);
-    private int turnCursor;
+    private readonly HashSet<string> guardedActors = new(StringComparer.Ordinal);
+    private int selectedCommandIndex;
 
     public BattleState State { get; }
     public IReadOnlyList<PartyMember> Party => State.Party;
@@ -40,16 +41,25 @@ public sealed class BattleSystem
     public string CommandMessage { get; private set; } = "Choose an action.";
 
     public PartyMember? SelectedActor =>
-        State.Party.FirstOrDefault(member =>
-            member.Id == State.SelectedActorId && member.HP > 0);
+        IsCurrentPartyActor
+            ? State.Party.FirstOrDefault(member =>
+                member.Id == State.SelectedActorId && member.HP > 0)
+            : null;
 
     public Character? SelectedTarget =>
         Enemies.FirstOrDefault(enemy =>
             GetEnemyId(enemy) == State.SelectedTargetId && enemy.HP > 0);
 
-    public BattleSystem(ExpeditionState expeditionState, IReadOnlyList<Character> enemies)
+    private bool IsCurrentPartyActor =>
+        State.Party.Any(member => member.Id == State.SelectedActorId && member.HP > 0);
+
+    public BattleSystem(
+        ExpeditionState expeditionState,
+        IReadOnlyList<Character> enemies,
+        CampaignState? campaignState = null)
     {
         expedition = expeditionState;
+        campaign = campaignState;
 
         if (expeditionState.Party.Count == 0)
             throw new InvalidOperationException("Battle requires at least one party member.");
@@ -59,29 +69,34 @@ public sealed class BattleSystem
         Enemies = enemies.ToList();
 
         for (int index = 0; index < Enemies.Count; index++)
-            enemyIds[Enemies[index]] = $"{Enemies[index].Name}:{Enemies[index].X}:{Enemies[index].Y}:{index}";
+            enemyIds[Enemies[index]] =
+                $"{Enemies[index].Name}:{Enemies[index].X}:{Enemies[index].Y}:{index}";
 
         State = new BattleState
         {
             Party = expeditionState.Party.ToList(),
             Enemies = Enemies.Select(ToEnemyState).ToList(),
             SelectedCommand = BattleCommand.Attack.ToString(),
-            Description = "Choose an action."
+            Description = "Choose an action.",
+            Round = 1
         };
 
         BattlePartyController controller = new(State);
-        State.SelectedActorId = controller.State.TurnOrder
-            .FirstOrDefault(IsLivingPartyMember) ?? State.Party[0].Id;
+        State.TurnIndex = Math.Max(0, State.TurnOrder.IndexOf(State.SelectedActorId));
+        EnsureValidTarget();
+        SynchronizeCurrentActor();
 
-        State.SelectedTargetId = GetEnemyId(Enemies[0]);
-        turnCursor = Math.Max(0, State.TurnOrder.IndexOf(State.SelectedActorId));
         CommandMessage = $"{SelectedActor?.Name ?? "Party"} is ready.";
+        State.Description = CommandMessage;
     }
 
     public void SelectNextCommand()
     {
-        int next = ((int)SelectedCommand + 1) % 6;
-        SelectedCommand = (BattleCommand)next;
+        if (IsFinished || !IsCurrentPartyActor || CurrentPhase != BattlePhase.PlayerCommand)
+            return;
+
+        selectedCommandIndex = (selectedCommandIndex + 1) % Enum.GetValues<BattleCommand>().Length;
+        SelectedCommand = (BattleCommand)selectedCommandIndex;
         State.SelectedCommand = SelectedCommand.ToString();
         CommandMessage = GetCommandDescription();
         State.Description = CommandMessage;
@@ -89,9 +104,14 @@ public sealed class BattleSystem
 
     public void SelectPreviousCommand()
     {
-        int previous = (int)SelectedCommand - 1;
-        if (previous < 0) previous = 5;
-        SelectedCommand = (BattleCommand)previous;
+        if (IsFinished || !IsCurrentPartyActor || CurrentPhase != BattlePhase.PlayerCommand)
+            return;
+
+        selectedCommandIndex--;
+        if (selectedCommandIndex < 0)
+            selectedCommandIndex = Enum.GetValues<BattleCommand>().Length - 1;
+
+        SelectedCommand = (BattleCommand)selectedCommandIndex;
         State.SelectedCommand = SelectedCommand.ToString();
         CommandMessage = GetCommandDescription();
         State.Description = CommandMessage;
@@ -99,8 +119,12 @@ public sealed class BattleSystem
 
     public void SelectNextTarget()
     {
-        List<Character> living = Enemies.Where(enemy => enemy.HP > 0).ToList();
-        if (living.Count == 0) return;
+        if (IsFinished || !IsCurrentPartyActor)
+            return;
+
+        List<Character> living = LivingEnemies();
+        if (living.Count == 0)
+            return;
 
         int current = living.FindIndex(enemy => GetEnemyId(enemy) == State.SelectedTargetId);
         int next = current < 0 ? 0 : (current + 1) % living.Count;
@@ -117,34 +141,41 @@ public sealed class BattleSystem
         if (IsFinished)
             return GetBattleResult();
 
-        PartyMember? actor = SelectedActor;
-        Character? target = SelectedTarget;
-        if (actor == null || target == null)
+        if (!IsCurrentPartyActor || CurrentPhase != BattlePhase.PlayerCommand)
         {
-            CommandMessage = "No valid combatant or target remains.";
+            CommandMessage = "It is not the party's turn.";
+            return BattleResult.Continue;
+        }
+
+        PartyMember actor = State.Party.First(member =>
+            member.Id == State.SelectedActorId && member.HP > 0);
+
+        EnsureValidTarget();
+        Character? target = SelectedTarget;
+
+        if (SelectedCommand is BattleCommand.Attack or BattleCommand.Skill && target == null)
+        {
+            CommandMessage = "No living target remains.";
             return BattleResult.Continue;
         }
 
         CurrentPhase = BattlePhase.PlayerAction;
         CurrentTurn = BattleTurn.Player;
 
+        BattleResult actionResult;
         switch (SelectedCommand)
         {
             case BattleCommand.Attack:
-                playerDamage = DealPlayerDamage(actor, target, 5, "strikes");
+                playerDamage = ApplyEnemyDamage(
+                    actor,
+                    target!,
+                    GetBasePhysicalDamage(actor, 5),
+                    "strikes");
+                actionResult = EvaluateBattleOutcome();
                 break;
 
             case BattleCommand.Skill:
-                if (actor.MP < 2)
-                {
-                    CommandMessage = $"{actor.Name} lacks the MP to use a skill.";
-                    return BattleResult.Continue;
-                }
-
-                actor.MP -= 2;
-                playerDamage = DealPlayerDamage(actor, target, 7, "channels");
-                if (target.HP > 0)
-                    ApplyStatus(target, "Poisoned", 2);
+                actionResult = PerformSkill(actor, target!, out playerDamage);
                 break;
 
             case BattleCommand.Item:
@@ -153,17 +184,23 @@ public sealed class BattleSystem
                     CommandMessage = "No healing item is available.";
                     return BattleResult.Continue;
                 }
+
                 CommandMessage = $"{actor.Name} uses a healing item.";
+                State.Description = CommandMessage;
+                actionResult = BattleResult.Continue;
                 break;
 
             case BattleCommand.Interact:
                 CommandMessage = "The battle space offers no interaction.";
+                State.Description = CommandMessage;
                 return BattleResult.Continue;
 
             case BattleCommand.Defend:
-                defendingActors.Add(actor.Id);
+                guardedActors.Add(actor.Id);
                 SetStatus(actor.Id, "Guarded");
                 CommandMessage = $"{actor.Name} braces for the incoming attack.";
+                State.Description = CommandMessage;
+                actionResult = BattleResult.Continue;
                 break;
 
             case BattleCommand.Run:
@@ -171,159 +208,191 @@ public sealed class BattleSystem
                 PlayerWon = false;
                 CurrentPhase = BattlePhase.Escaped;
                 CommandMessage = $"{actor.Name} withdrew from the encounter.";
+                State.Description = CommandMessage;
+                CurrentTurn = BattleTurn.Player;
                 return BattleResult.Escaped;
+
+            default:
+                actionResult = BattleResult.Continue;
+                break;
         }
 
         SyncEnemyState();
 
-        if (LivingEnemies().Count == 0)
+        if (actionResult != BattleResult.Continue || IsFinished)
+            return actionResult;
+
+        AdvanceToNextActor();
+
+        while (!IsFinished && IsCurrentEnemyActor)
         {
-            IsFinished = true;
-            PlayerWon = true;
-            CurrentPhase = BattlePhase.Victory;
-            CurrentTurn = BattleTurn.Player;
-            CommandMessage += " The hostile formation collapses.";
-            return BattleResult.EnemyDefeated;
+            int actionDamage = PerformEnemyTurn();
+            enemyDamage += actionDamage;
+
+            BattleResult enemyResult = EvaluateBattleOutcome();
+            if (enemyResult != BattleResult.Continue)
+                return enemyResult;
+
+            AdvanceToNextActor();
         }
 
-        enemyDamage = PerformEnemyPhase();
+        if (IsFinished)
+            return GetBattleResult();
 
-        if (LivingEnemies().Count == 0)
-        {
-            IsFinished = true;
-            PlayerWon = true;
-            CurrentPhase = BattlePhase.Victory;
-            CurrentTurn = BattleTurn.Player;
-            CommandMessage += " The last hostile succumbs.";
-            return BattleResult.EnemyDefeated;
-        }
-
-        if (LivingParty().Count == 0)
-        {
-            IsFinished = true;
-            PlayerWon = false;
-            CurrentPhase = BattlePhase.Defeat;
-            CommandMessage += " The expedition is overwhelmed.";
-            return BattleResult.PlayerDefeated;
-        }
-
-        AdvanceToNextPartyActor();
         CurrentPhase = BattlePhase.PlayerCommand;
         CurrentTurn = BattleTurn.Player;
+        selectedCommandIndex = 0;
+        SelectedCommand = BattleCommand.Attack;
+        State.SelectedCommand = SelectedCommand.ToString();
+        EnsureValidTarget();
+        CommandMessage = $"{SelectedActor?.Name ?? "Party"} is ready.";
+        State.Description = CommandMessage;
+
         return BattleResult.Continue;
     }
 
-    private int DealPlayerDamage(PartyMember actor, Character target, int power, string verb)
+    private BattleResult PerformSkill(
+        PartyMember actor,
+        Character target,
+        out int damage)
     {
-        int damage = Math.Max(1, actor.Stats.Strength + power);
+        if (actor.MP < 2)
+        {
+            CommandMessage = $"{actor.Name} lacks the MP to use a skill.";
+            State.Description = CommandMessage;
+            damage = 0;
+            return BattleResult.Continue;
+        }
+
+        actor.MP -= 2;
+
+        SkillDefinition skill = GetSkillDefinition(actor);
+        int rawDamage = skill.UseMagic
+            ? GetBaseMagicDamage(actor, skill.Power)
+            : GetBasePhysicalDamage(actor, skill.Power);
+
+        damage = ApplyEnemyDamage(actor, target, rawDamage, skill.Verb);
+
+        if (target.HP > 0 && skill.AppliesPoison)
+            ApplyStatus(target, "Poisoned", 2);
+
+        if (target.HP > 0 && skill.AppliesExposed)
+            ApplyStatus(target, "Exposed", 1);
+
+        return EvaluateBattleOutcome();
+    }
+
+    private int PerformEnemyTurn()
+    {
+        CurrentPhase = BattlePhase.EnemyAction;
+        CurrentTurn = BattleTurn.Enemy;
+
+        Character? enemy = GetCurrentEnemy();
+        if (enemy == null)
+            return 0;
+
+        int statusDamage = ApplyEnemyStartOfTurnEffects(enemy);
+        if (enemy.HP <= 0)
+        {
+            SyncEnemyState();
+            return statusDamage;
+        }
+
+        PartyMember? target = SelectEnemyTarget(enemy);
+        if (target == null)
+            return statusDamage;
+
+        int basePower = GetEnemyPower(enemy);
+        int damage = CalculateEnemyDamage(enemy, target, basePower);
+        ApplyPartyDamage(enemy, target, damage);
+
+        if (statusDamage > 0)
+            CommandMessage += $" Poison deals {statusDamage} damage.";
+
+        return statusDamage + damage;
+    }
+
+    private void ApplyPartyDamage(Character enemy, PartyMember target, int damage)
+    {
+        int previousHp = target.HP;
+        target.HP = Math.Max(0, target.HP - damage);
+
+        string guardText = guardedActors.Contains(target.Id) ? " through guard" : string.Empty;
+        CommandMessage = $"{enemy.Name} hits {target.Name} for {damage} damage{guardText}.";
+
+        if (previousHp > 0 && target.HP == 0)
+        {
+            ClearStatus(target.Id, "Guarded");
+            guardedActors.Remove(target.Id);
+            MoraleSystem.ApplyEvent(expedition, MoraleEventType.AllyDefeated);
+            CommandMessage += $" {target.Name} is down.";
+        }
+
+        if (guardedActors.Contains(target.Id))
+        {
+            ClearStatus(target.Id, "Guarded");
+            guardedActors.Remove(target.Id);
+        }
+    }
+
+    private int ApplyEnemyDamage(
+        PartyMember actor,
+        Character target,
+        int baseDamage,
+        string verb)
+    {
+        int damage = Math.Max(1, baseDamage);
+
+        if (HasStatus(target, "Exposed"))
+        {
+            damage += 4;
+            ClearStatus(target, "Exposed");
+        }
+
         target.TakeDamage(damage);
         CommandMessage = $"{actor.Name} {verb} {target.Name} for {damage} damage.";
 
         if (target.HP <= 0)
         {
-            if (!defeatedEnemies.Contains(target))
-                defeatedEnemies.Add(target);
+            RegisterEnemyDefeat(target);
             CommandMessage += $" {target.Name} falls.";
         }
 
         return damage;
     }
 
-    private int PerformEnemyPhase()
+    private void RegisterEnemyDefeat(Character enemy)
     {
-        CurrentPhase = BattlePhase.EnemyAction;
-        CurrentTurn = BattleTurn.Enemy;
-        int totalDamage = 0;
-        int statusDamage = ApplyPoisonDamage();
+        if (defeatedEnemies.Contains(enemy))
+            return;
 
-        foreach (string actorId in State.TurnOrder)
-        {
-            if (IsLivingPartyMember(actorId))
-                continue;
-
-            Character? enemy = Enemies.FirstOrDefault(candidate =>
-                GetEnemyId(candidate) == actorId && candidate.HP > 0);
-
-            if (enemy == null)
-                continue;
-
-            PartyMember? target = LivingParty()
-                .OrderBy(member => member.HP)
-                .ThenBy(member => member.Id, StringComparer.Ordinal)
-                .FirstOrDefault();
-
-            if (target == null)
-                break;
-
-            int defense = defendingActors.Contains(target.Id) ? 2 : 0;
-            int damage = Math.Max(0, enemy.Stats.Strength + 3 - defense);
-            target.HP = Math.Max(0, target.HP - damage);
-            totalDamage += damage;
-
-            CommandMessage = $"{enemy.Name} hits {target.Name} for {damage} damage.";
-            if (target.HP == 0)
-                CommandMessage += $" {target.Name} is down.";
-        }
-
-        if (statusDamage > 0)
-            CommandMessage += $" Poison deals {statusDamage} damage.";
-
-        foreach (string actorId in defendingActors)
-            ClearStatus(actorId, "Guarded");
-
-        defendingActors.Clear();
-        return totalDamage + statusDamage;
+        defeatedEnemies.Add(enemy);
+        poisonTurns.Remove(GetEnemyId(enemy));
+        ClearStatus(GetEnemyId(enemy), "Poisoned");
+        ClearStatus(GetEnemyId(enemy), "Exposed");
     }
 
-    private void AdvanceToNextPartyActor()
+    private int ApplyEnemyStartOfTurnEffects(Character enemy)
     {
-        if (State.TurnOrder.Count == 0) return;
+        string id = GetEnemyId(enemy);
+        if (!poisonTurns.TryGetValue(id, out int turns) || turns <= 0)
+            return 0;
 
-        for (int offset = 1; offset <= State.TurnOrder.Count; offset++)
+        int damage = 2;
+        enemy.TakeDamage(damage);
+        turns--;
+
+        if (enemy.HP <= 0)
+            RegisterEnemyDefeat(enemy);
+
+        if (turns <= 0)
         {
-            int index = (turnCursor + offset) % State.TurnOrder.Count;
-            string id = State.TurnOrder[index];
-            if (IsLivingPartyMember(id))
-            {
-                turnCursor = index;
-                State.TurnIndex = index;
-                State.SelectedActorId = id;
-                return;
-            }
+            poisonTurns.Remove(id);
+            ClearStatus(id, "Poisoned");
         }
-    }
-
-    private bool IsLivingPartyMember(string id) =>
-        State.Party.Any(member => member.Id == id && member.HP > 0);
-
-    private List<PartyMember> LivingParty() =>
-        State.Party.Where(member => member.HP > 0).ToList();
-
-    private List<Character> LivingEnemies() =>
-        Enemies.Where(enemy => enemy.HP > 0).ToList();
-
-    private int ApplyPoisonDamage()
-    {
-        int damage = 0;
-
-        foreach (Character enemy in LivingEnemies().ToList())
+        else
         {
-            string id = GetEnemyId(enemy);
-            if (!poisonTurns.TryGetValue(id, out int turns) || turns <= 0)
-                continue;
-
-            enemy.TakeDamage(2);
-            damage += 2;
-            turns--;
-            if (turns == 0)
-            {
-                poisonTurns.Remove(id);
-                ClearStatus(id, "Poisoned");
-            }
-            else
-            {
-                poisonTurns[id] = turns;
-            }
+            poisonTurns[id] = turns;
         }
 
         SyncEnemyState();
@@ -333,8 +402,11 @@ public sealed class BattleSystem
     private void ApplyStatus(Character enemy, string status, int turns)
     {
         string id = GetEnemyId(enemy);
+
         if (status == "Poisoned")
-            poisonTurns[id] = Math.Max(turns, poisonTurns.TryGetValue(id, out int current) ? current : 0);
+            poisonTurns[id] = Math.Max(
+                turns,
+                poisonTurns.TryGetValue(id, out int current) ? current : 0);
 
         if (!State.StatusEffects.TryGetValue(id, out List<string>? statuses))
             State.StatusEffects[id] = statuses = new List<string>();
@@ -375,6 +447,7 @@ public sealed class BattleSystem
     private bool TryUseHealingItem(PartyMember actor)
     {
         string[] preferred = { "healing-tonic", "field-ration" };
+
         foreach (string itemId in preferred)
         {
             if (!InventorySystem.RemoveItem(expedition, itemId))
@@ -388,6 +461,235 @@ public sealed class BattleSystem
         return false;
     }
 
+    private void AdvanceToNextActor()
+    {
+        if (State.TurnOrder.Count == 0)
+            return;
+
+        int currentIndex = State.TurnIndex;
+
+        for (int offset = 1; offset <= State.TurnOrder.Count; offset++)
+        {
+            int nextIndex = (currentIndex + offset) % State.TurnOrder.Count;
+            string actorId = State.TurnOrder[nextIndex];
+
+            if (!IsLivingCombatant(actorId))
+                continue;
+
+            if (nextIndex <= currentIndex)
+                State.Round++;
+
+            State.TurnIndex = nextIndex;
+            State.SelectedActorId = actorId;
+            SynchronizeCurrentActor();
+            return;
+        }
+    }
+
+    private void SynchronizeCurrentActor()
+    {
+        if (IsCurrentPartyActor)
+        {
+            CurrentTurn = BattleTurn.Player;
+            return;
+        }
+
+        if (IsCurrentEnemyActor)
+        {
+            CurrentTurn = BattleTurn.Enemy;
+            return;
+        }
+
+        CurrentTurn = BattleTurn.Player;
+    }
+
+    private bool IsLivingCombatant(string id) =>
+        State.Party.Any(member => member.Id == id && member.HP > 0) ||
+        Enemies.Any(enemy => GetEnemyId(enemy) == id && enemy.HP > 0);
+
+    private bool IsCurrentEnemyActor =>
+        Enemies.Any(enemy => GetEnemyId(enemy) == State.SelectedActorId && enemy.HP > 0);
+
+    private Character? GetCurrentEnemy() =>
+        Enemies.FirstOrDefault(enemy =>
+            GetEnemyId(enemy) == State.SelectedActorId && enemy.HP > 0);
+
+    private PartyMember? SelectEnemyTarget(Character enemy)
+    {
+        BattleEnemyState? state = State.Enemies.FirstOrDefault(candidate =>
+            candidate.Id == GetEnemyId(enemy));
+
+        IEnumerable<PartyMember> living = LivingParty();
+        if (!living.Any())
+            return null;
+
+        return state?.Behavior switch
+        {
+            "Guard" => living
+                .OrderByDescending(GetEffectiveDefense)
+                .ThenByDescending(member => member.HP)
+                .ThenBy(member => member.Id, StringComparer.Ordinal)
+                .First(),
+
+            "Brute" => living
+                .OrderByDescending(member => member.MaxHP)
+                .ThenBy(member => member.Id, StringComparer.Ordinal)
+                .First(),
+
+            _ => living
+                .OrderBy(member => member.HP)
+                .ThenBy(member => member.Id, StringComparer.Ordinal)
+                .First()
+        };
+    }
+
+    private int CalculateEnemyDamage(Character enemy, PartyMember target, int power)
+    {
+        int defense = GetEffectiveDefense(target);
+        int damage = Math.Max(1, enemy.Stats.Strength + power - defense);
+
+        if (guardedActors.Contains(target.Id))
+            damage = Math.Max(0, damage - 4);
+
+        return damage;
+    }
+
+    private int GetEffectiveDefense(PartyMember member)
+    {
+        int gearDefense = GetGearPower(member, "Armor", "Accessory");
+        MoraleModifier morale = MoraleSystem.GetModifier(member);
+
+        return Math.Max(
+            0,
+            (int)Math.Round((1 + gearDefense) * morale.DefenseMultiplier));
+    }
+
+    private int GetBasePhysicalDamage(PartyMember member, int power)
+    {
+        MoraleModifier morale = MoraleSystem.GetModifier(member);
+        int weaponPower = GetGearPower(member, "Weapon");
+
+        return Math.Max(
+            1,
+            (int)Math.Round(member.Stats.Strength * morale.AttackMultiplier)
+            + power
+            + weaponPower);
+    }
+
+    private int GetBaseMagicDamage(PartyMember member, int power)
+    {
+        MoraleModifier morale = MoraleSystem.GetModifier(member);
+
+        return Math.Max(
+            1,
+            (int)Math.Round(member.Stats.Magic * morale.AttackMultiplier) + power);
+    }
+
+    private int GetGearPower(PartyMember member, params string[] slots)
+    {
+        if (campaign == null)
+            return 0;
+
+        int power = 0;
+        foreach (string gearId in member.EquippedGearIds)
+        {
+            Gear? gear = campaign.Gear.FirstOrDefault(candidate => candidate.Id == gearId);
+            if (gear == null)
+                continue;
+
+            if (slots.Any(slot =>
+                gear.Slot.Equals(slot, StringComparison.OrdinalIgnoreCase)))
+                power += gear.Power;
+        }
+
+        return power;
+    }
+
+    private SkillDefinition GetSkillDefinition(PartyMember member) =>
+        member.SpriteId.ToLowerInvariant() switch
+        {
+            "arden" => new SkillDefinition("Break", 9, false, false, "breaks"),
+            "lyra" => new SkillDefinition("Resonance", 8, true, true, "channels"),
+            "marek" => new SkillDefinition("Crush", 11, false, false, "crushes"),
+            "sera" => new SkillDefinition("Expose", 5, false, true, "exposes"),
+            _ => new SkillDefinition("Skill", 7, false, false, "channels")
+        };
+
+    private int GetEnemyPower(Character enemy)
+    {
+        return State.Enemies.FirstOrDefault(state =>
+            state.Id == GetEnemyId(enemy))?.Behavior switch
+        {
+            "Guard" => 3,
+            "Stalker" => 4,
+            "Brute" => 7,
+            _ => 3
+        };
+    }
+
+    private string InferEnemyBehavior(Character enemy)
+    {
+        string name = enemy.Name.ToLowerInvariant();
+
+        if (name.Contains("brute"))
+            return "Brute";
+        if (name.Contains("stalker") || name.Contains("hound") || name.Contains("moth"))
+            return "Stalker";
+        if (name.Contains("guard") || name.Contains("warden") || name.Contains("sentinel"))
+            return "Guard";
+
+        return "Stalker";
+    }
+
+    private BattleResult EvaluateBattleOutcome()
+    {
+        if (LivingEnemies().Count == 0)
+        {
+            IsFinished = true;
+            PlayerWon = true;
+            CurrentPhase = BattlePhase.Victory;
+            CurrentTurn = BattleTurn.Player;
+            CommandMessage = string.IsNullOrWhiteSpace(CommandMessage)
+                ? "The hostile formation collapses."
+                : CommandMessage + " The hostile formation collapses.";
+            State.Description = CommandMessage;
+            return BattleResult.EnemyDefeated;
+        }
+
+        if (LivingParty().Count == 0)
+        {
+            IsFinished = true;
+            PlayerWon = false;
+            CurrentPhase = BattlePhase.Defeat;
+            CommandMessage += " The expedition is overwhelmed.";
+            State.Description = CommandMessage;
+            return BattleResult.PlayerDefeated;
+        }
+
+        return BattleResult.Continue;
+    }
+
+    private void EnsureValidTarget()
+    {
+        List<Character> living = LivingEnemies();
+        if (living.Count == 0)
+        {
+            State.SelectedTargetId = string.Empty;
+            return;
+        }
+
+        if (living.Any(enemy => GetEnemyId(enemy) == State.SelectedTargetId))
+            return;
+
+        State.SelectedTargetId = GetEnemyId(living[0]);
+    }
+
+    private List<PartyMember> LivingParty() =>
+        State.Party.Where(member => member.HP > 0).ToList();
+
+    private List<Character> LivingEnemies() =>
+        Enemies.Where(enemy => enemy.HP > 0).ToList();
+
     private BattleEnemyState ToEnemyState(Character enemy) =>
         new()
         {
@@ -396,18 +698,28 @@ public sealed class BattleSystem
             HP = enemy.HP,
             MaxHP = enemy.MAXHP,
             Agility = enemy.Stats.Agility,
-            Family = "Hollow"
+            Family = InferEnemyFamily(enemy),
+            Behavior = InferEnemyBehavior(enemy)
         };
 
-    private string GetEnemyId(Character enemy) =>
-        enemyIds[enemy];
+    private string InferEnemyFamily(Character enemy) =>
+        enemy.Name.Contains("Ash", StringComparison.OrdinalIgnoreCase) ? "Ash" :
+        enemy.Name.Contains("Crystal", StringComparison.OrdinalIgnoreCase) ? "Crystal" :
+        enemy.Name.Contains("Verdant", StringComparison.OrdinalIgnoreCase) ? "Verdant" :
+        "Hollow";
+
+    private string GetEnemyId(Character enemy) => enemyIds[enemy];
 
     private void SyncEnemyState()
     {
         foreach (BattleEnemyState enemyState in State.Enemies)
         {
-            Character? enemy = Enemies.FirstOrDefault(candidate => GetEnemyId(candidate) == enemyState.Id);
-            if (enemy == null) continue;
+            Character? enemy = Enemies.FirstOrDefault(candidate =>
+                GetEnemyId(candidate) == enemyState.Id);
+
+            if (enemy == null)
+                continue;
+
             enemyState.HP = enemy.HP;
             enemyState.MaxHP = enemy.MAXHP;
         }
@@ -416,7 +728,7 @@ public sealed class BattleSystem
     private string GetCommandDescription() => SelectedCommand switch
     {
         BattleCommand.Attack => "Strike the selected hostile.",
-        BattleCommand.Skill => "Spend 2 MP for a stronger attack.",
+        BattleCommand.Skill => $"Use {SelectedActor?.Name ?? "the actor"}'s signature skill.",
         BattleCommand.Item => "Consume a healing field item.",
         BattleCommand.Interact => "Check the battle space.",
         BattleCommand.Defend => "Brace to reduce incoming damage.",
@@ -426,7 +738,21 @@ public sealed class BattleSystem
 
     private BattleResult GetBattleResult()
     {
-        if (!IsFinished) return BattleResult.Continue;
-        return PlayerWon ? BattleResult.EnemyDefeated : BattleResult.PlayerDefeated;
+        if (!IsFinished)
+            return BattleResult.Continue;
+
+        return PlayerWon
+            ? BattleResult.EnemyDefeated
+            : BattleResult.PlayerDefeated;
+    }
+
+    private readonly record struct SkillDefinition(
+        string Name,
+        int Power,
+        bool UseMagic,
+        bool AppliesPoison,
+        string Verb)
+    {
+        public bool AppliesExposed => Name.Equals("Expose", StringComparison.OrdinalIgnoreCase);
     }
 }
