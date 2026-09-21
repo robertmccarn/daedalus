@@ -173,6 +173,7 @@ public sealed class PartyController
                 desired,
                 leaderPosition,
                 occupied,
+                new HashSet<GridPosition>(),
                 fallbackOrigin: leaderPosition);
 
             follower.Direction = leader.Direction;
