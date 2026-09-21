@@ -71,8 +71,17 @@ public sealed class StructureRenderer
 
         if (unit.IsActivated)
         {
-            using Pen active = new(Color.FromArgb(175, baseColor.R, baseColor.G, baseColor.B), 2);
-            g.DrawEllipse(active, s.X + 2, s.Y + 2 - lift, 24, 24);
+            float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 900, unit.X * 41L + unit.Y * 17L);
+            int radius = 11 + (int)(4 * pulse);
+            using Pen active = new(
+                Color.FromArgb(110 + (int)(70 * pulse), baseColor.R, baseColor.G, baseColor.B),
+                2);
+            g.DrawEllipse(
+                active,
+                s.X + 14 - radius,
+                s.Y + 20 - radius - lift,
+                radius * 2,
+                radius * 2);
         }
     }
 
@@ -92,11 +101,11 @@ public sealed class StructureRenderer
         switch (prop)
         {
             case Chest chest:
-                DrawChest(g, s, lift, p, chest.IsOpen, now, context.Feedback);
+                DrawChest(g, s, lift, p, chest.IsOpen, now, context.Feedback, prop.X, prop.Y);
                 break;
 
             case Terminal terminal:
-                DrawTerminal(g, s, lift, p, terminal.IsActivated, now, context.Feedback);
+                DrawTerminal(g, s, lift, p, terminal.IsActivated, now, context.Feedback, prop.X, prop.Y);
                 break;
 
             default:
@@ -117,16 +126,23 @@ public sealed class StructureRenderer
         WorldPresentationProfile p,
         bool isOpen,
         long now,
-        FeedbackEffect? feedback)
+        FeedbackEffect? feedback,
+        int worldX,
+        int worldY)
     {
         using Brush wood = new SolidBrush(Color.FromArgb(125, 94, 63));
         g.FillRectangle(wood, s.X + 5, s.Y + 11 - lift, 18, 12);
 
         using Brush lid = new SolidBrush(Color.FromArgb(159, 121, 78));
         float opening = isOpen ? 1f : 0f;
-        if (feedback is { Type: FeedbackEffectType.Loot })
+        if (feedback is { Type: FeedbackEffectType.Loot } &&
+            feedback.X == worldX &&
+            feedback.Y == worldY)
         {
-            float elapsed = AnimationClock.AttackProgress(now, feedback.StartedAt, Math.Min(650, feedback.DurationMs));
+            float elapsed = AnimationClock.AttackProgress(
+                now,
+                feedback.StartedAt,
+                Math.Min(650, feedback.DurationMs));
             opening = isOpen ? Math.Clamp(elapsed, 0f, 1f) : 0f;
         }
 
@@ -151,7 +167,9 @@ public sealed class StructureRenderer
         WorldPresentationProfile p,
         bool isActivated,
         long now,
-        FeedbackEffect? feedback)
+        FeedbackEffect? feedback,
+        int worldX,
+        int worldY)
     {
         Color accent = p.Accent;
 
@@ -178,10 +196,37 @@ public sealed class StructureRenderer
         if (isActivated)
         {
             int radius = 12 + (int)(5 * pulse);
-            using Pen ring = new(Color.FromArgb(110 + (int)(70 * pulse), accent.R, accent.G, accent.B), 1);
-            g.DrawEllipse(ring, s.X + 14 - radius, s.Y + 14 - radius - lift, radius * 2, radius * 2);
-        }
+            using Pen ring = new(
+                Color.FromArgb(110 + (int)(70 * pulse), accent.R, accent.G, accent.B),
+                1);
+            g.DrawEllipse(
+                ring,
+                s.X + 14 - radius,
+                s.Y + 14 - radius - lift,
+                radius * 2,
+                radius * 2);
 
-        _ = feedback;
+            if (feedback is { Type: FeedbackEffectType.Heal } &&
+                feedback.X == worldX &&
+                feedback.Y == worldY)
+            {
+                float activation = AnimationClock.AttackProgress(
+                    now,
+                    feedback.StartedAt,
+                    Math.Min(900, feedback.DurationMs));
+                int burstRadius = 10 + (int)(38 * activation);
+                int burstAlpha = Math.Max(8, (int)(150 * (1f - activation)));
+
+                using Pen burst = new(
+                    Color.FromArgb(burstAlpha, accent.R, accent.G, accent.B),
+                    2);
+                g.DrawEllipse(
+                    burst,
+                    s.X + 14 - burstRadius,
+                    s.Y + 14 - burstRadius - lift,
+                    burstRadius * 2,
+                    burstRadius * 2);
+            }
+        }
     }
 }
