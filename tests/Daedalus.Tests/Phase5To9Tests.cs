@@ -94,4 +94,42 @@ public class Phase5To9Tests
         Assert.Contains(campaign.Gear, gear => gear.Id == "iron-blade");
         Assert.Contains(campaign.Recipes, recipe => recipe.Id == "field-coat-reinforcement");
     }
+
+    [Fact]
+    public void ExplorationRenderContext_CarriesPlayerFacingFeedback()
+    {
+        GameWorld world = new(1, 12345);
+        ExpeditionState expedition = new()
+        {
+            Party = new()
+            {
+                new PartyMember
+                {
+                    Id = "leader",
+                    Name = "Arden",
+                    HP = 30,
+                    MaxHP = 30
+                }
+            },
+            LeaderId = "leader",
+            Formation = PartyFormationType.Column,
+            PlayerGridPosition = (world.SpawnX, world.SpawnY)
+        };
+
+        PartyController party = new(world);
+        party.Initialize(
+            expedition,
+            new GridPosition(world.SpawnX, world.SpawnY));
+
+        ExplorationRenderContext context = new(
+            world,
+            party,
+            expedition,
+            (_, _) => true,
+            "Reach the extraction point.",
+            "Supplies recovered.");
+
+        Assert.Equal("Reach the extraction point.", context.CurrentObjective);
+        Assert.Equal("Supplies recovered.", context.Message);
+    }
 }
