@@ -25,7 +25,6 @@ public class GameWindow : Form
         DoubleBuffered = true;
 
         Paint += DrawGame;
-        KeyDown += HandleKeyDown;
         renderTimer.Tick += (_, _) =>
         {
             session.Party.AdvanceAnimation();
@@ -34,30 +33,56 @@ public class GameWindow : Form
         renderTimer.Start();
     }
 
-    private void HandleKeyDown(object? sender, KeyEventArgs e)
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        Keys key = keyData & Keys.KeyCode;
+
         switch (session.State)
         {
             case GameState.Battle:
-                HandleBattleInput(e);
+                if (HandleBattleInput(key))
+                {
+                    Invalidate();
+                    return true;
+                }
                 break;
             case GameState.ExtractionResults:
-                if (e.KeyCode == Keys.Enter) session.ReturnToCampaign();
+                if (key == Keys.Enter || key == Keys.Space)
+                {
+                    session.ReturnToCampaign();
+                    Invalidate();
+                    return true;
+                }
                 break;
             case GameState.Campaign:
-                if (e.KeyCode == Keys.Enter) session.StartNewExpeditionFromCampaign();
+                if (key == Keys.Enter || key == Keys.Space)
+                {
+                    session.StartNewExpeditionFromCampaign();
+                    Invalidate();
+                    return true;
+                }
                 break;
             case GameState.GameOver:
-                if (e.KeyCode == Keys.Enter) session.StartNewExpeditionFromCampaign();
+                if (key == Keys.Enter || key == Keys.Space)
+                {
+                    session.StartNewExpeditionFromCampaign();
+                    Invalidate();
+                    return true;
+                }
                 break;
             case GameState.Exploration:
-                HandleExplorationInput(e);
+                if (HandleExplorationInput(key))
+                {
+                    Invalidate();
+                    return true;
+                }
                 break;
         }
-        Invalidate();
+
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    private void HandleExplorationInput(KeyEventArgs e)
+    private bool HandleExplorationInput(Keys key)
     {
         if (e.KeyCode == Keys.C)
         {
