@@ -10,6 +10,7 @@ public class GameSession
     public BattleSystem? Battle { get; private set; }
     public string Message { get; private set; }
     public GameStateManager StateManager { get; }
+    public ExtractionSummary? LastExtraction { get; private set; }
     public string CurrentObjective =>
         StateManager.ActiveExpedition.CurrentFloor <= 1
             ? "Reach the extraction point with something worth bringing back."
@@ -24,17 +25,7 @@ public class GameSession
         StateManager = new GameStateManager();
         Party = new PartyController(World);
 
-        StateManager.StartNewExpedition(
-            World.SpawnX, World.SpawnY, 30, 30, World.Floor, World.FloorSeed,
-            StateManager.Campaign.PartyRoster.Take(4).Select(member => member.Id).ToArray(),
-            StateManager.Campaign.PartyRoster[0].Id, PartyFormationType.Column);
-
-        Party.Initialize(StateManager.ActiveExpedition, new GridPosition(World.SpawnX, World.SpawnY));
-        SyncCompatibilityPlayer();
-        SynchronizeExpedition();
-        RecordNodeVisit(World.SpawnX, World.SpawnY);
-        UpdateVisibility();
-        ApplyGearBonuses();
+        StartNewExpeditionInternal();
     }
 
     public MoveResult MovePlayer(int deltaX, int deltaY)
@@ -160,14 +151,18 @@ public class GameSession
 
     public void CancelBattle()
     {
-        if (State == GameState.Battle) EndBattle();
+        if (State == GameState.Battle)
+        {
+            MoraleSystem.ApplyEvent(StateManager.ActiveExpedition, MoraleEventType.Retreat);
+            EndBattle();
+        }
     }
 
     public void PerformBattleCommand()
     {
         if (Battle == null || State != GameState.Battle) return;
 
-        BattleResult result = Battle.PerformPlayerTurn(out int playerDamage, out int enemyDamage);
+        BattleResult result = Battle.PerformPlayerTurn(out _, out int enemyDamage);
         SynchronizeExpedition();
         Message = Battle.CommandMessage;
 
@@ -183,11 +178,7 @@ public class GameSession
                 foreach (PartyMember partyMember in StateManager.ActiveExpedition.Party.Where(member => member.HP > 0))
                     ProgressionSystem.ApplyExperience(partyMember, reward.Experience);
 
-                ExtractionSystem.ApplyReward(
-                    StateManager.Campaign,
-                    StateManager.ActiveExpedition,
-                    reward);
-
+                ExtractionSystem.ApplyReward(StateManager.Campaign, StateManager.ActiveExpedition, reward);
                 World.BeginEnemyDeath(defeatedEnemy);
                 CompleteNode(defeatedEnemy.X, defeatedEnemy.Y);
             }
@@ -223,7 +214,6 @@ public class GameSession
 
         if (enemyDamage > 0)
             Message = $"{Battle.CommandMessage} Enemy pressure: {enemyDamage} damage.";
-        _ = playerDamage;
     }
 
     public void DiscoverCell(int x, int y) => StateManager.DiscoverArea(x, y);
@@ -261,11 +251,46 @@ public class GameSession
             return false;
         }
 
-        int upkeep = StateManager.ActiveExpedition.Upkeep;
+        ExpeditionState expedition = StateManager.ActiveExpedition;
+        int depth = expedition.CurrentFloor;
+        int gold = expedition.CarriedGold;
+        int cores = expedition.CarriedCores.Count;
+        int materials = expedition.CarriedMaterials.Sum(material => material.Quantity);
+        int items = expedition.CarriedInventory.Sum(item => item.Quantity);
+        int gear = expedition.CarriedGear.Count;
+
+        int upkeep = expedition.Upkeep;
         if (!ExtractionSystem.Extract(StateManager)) return false;
 
-        Message = $"Expedition extracted at depth {StateManager.ActiveExpedition.CurrentFloor}. Upkeep settled: {upkeep}.";
+        LastExtraction = new ExtractionSummary(
+            depth,
+            gold,
+            cores,
+            materials,
+            items,
+            gear,
+            StateManager.Campaign.Gold,
+            StateManager.Campaign.RunsCompleted);
+
+        Message = $"Expedition extracted at depth {depth}. Upkeep settled: {upkeep}.";
+        State = GameState.ExtractionResults;
+        Battle = null;
         return true;
+    }
+
+    public void ReturnToCampaign()
+    {
+        if (State == GameState.ExtractionResults)
+        {
+            State = GameState.Campaign;
+            Message = "Expedition complete. Prepare the next descent.";
+        }
+    }
+
+    public void StartNewExpeditionFromCampaign()
+    {
+        if (State == GameState.Campaign || State == GameState.ExtractionResults || State == GameState.GameOver)
+            StartNewExpeditionInternal();
     }
 
     public Gear? SynthesizeGear(string recipeId)
@@ -282,6 +307,26 @@ public class GameSession
         return equipped;
     }
 
+    private void StartNewExpeditionInternal()
+    {
+        World.RebuildFloor(Random.Shared.Next(), 1);
+        StateManager.StartNewExpedition(
+            World.SpawnX, World.SpawnY, 30, 30, World.Floor, World.FloorSeed,
+            StateManager.Campaign.PartyRoster.Take(4).Select(member => member.Id).ToArray(),
+            StateManager.Campaign.PartyRoster[0].Id, PartyFormationType.Column);
+
+        Party.Initialize(StateManager.ActiveExpedition, new GridPosition(World.SpawnX, World.SpawnY));
+        SyncCompatibilityPlayer();
+        SynchronizeExpedition();
+        RecordNodeVisit(World.SpawnX, World.SpawnY);
+        UpdateVisibility();
+        ApplyGearBonuses();
+
+        State = GameState.Exploration;
+        Battle = null;
+        Message = "The expedition enters the ruins.";
+    }
+
     private void StartBattle(Character enemy)
     {
         SyncCompatibilityPlayer();
@@ -294,10 +339,7 @@ public class GameSession
             .Take(3)
             .ToList();
 
-        Battle = new BattleSystem(
-            StateManager.ActiveExpedition,
-            battleEnemies);
-
+        Battle = new BattleSystem(StateManager.ActiveExpedition, battleEnemies);
         State = GameState.Battle;
         Message = Battle.CommandMessage;
     }
