@@ -24,6 +24,7 @@ public sealed class BattleSystem
     private readonly HashSet<string> defendingActors = new(StringComparer.Ordinal);
     private readonly List<Character> defeatedEnemies = new();
     private readonly Dictionary<Character, string> enemyIds = new();
+    private readonly Dictionary<string, int> poisonTurns = new(StringComparer.Ordinal);
     private int turnCursor;
 
     public BattleState State { get; }
@@ -142,6 +143,8 @@ public sealed class BattleSystem
 
                 actor.MP -= 2;
                 playerDamage = DealPlayerDamage(actor, target, 7, "channels");
+                if (target.HP > 0)
+                    ApplyStatus(target, "Poisoned", 2);
                 break;
 
             case BattleCommand.Item:
@@ -159,6 +162,7 @@ public sealed class BattleSystem
 
             case BattleCommand.Defend:
                 defendingActors.Add(actor.Id);
+                SetStatus(actor.Id, "Guarded");
                 CommandMessage = $"{actor.Name} braces for the incoming attack.";
                 break;
 
@@ -219,8 +223,18 @@ public sealed class BattleSystem
         CurrentPhase = BattlePhase.EnemyAction;
         CurrentTurn = BattleTurn.Enemy;
         int totalDamage = 0;
+        int statusDamage = ApplyPoisonDamage();
 
-        foreach (Character enemy in LivingEnemies().ToList())
+        foreach (string actorId in State.TurnOrder)
+        {
+            if (IsLivingPartyMember(actorId))
+                continue;
+
+            Character? enemy = Enemies.FirstOrDefault(candidate =>
+                GetEnemyId(candidate) == actorId && candidate.HP > 0);
+
+            if (enemy == null)
+                continue;
         {
             PartyMember? target = LivingParty()
                 .OrderBy(member => member.HP)
@@ -240,8 +254,11 @@ public sealed class BattleSystem
                 CommandMessage += $" {target.Name} is down.";
         }
 
+        if (statusDamage > 0)
+            CommandMessage += $" Poison deals {statusDamage} damage.";
+
         defendingActors.Clear();
-        return totalDamage;
+        return totalDamage + statusDamage;
     }
 
     private void AdvanceToNextPartyActor()
@@ -270,6 +287,70 @@ public sealed class BattleSystem
 
     private List<Character> LivingEnemies() =>
         Enemies.Where(enemy => enemy.HP > 0).ToList();
+
+    private int ApplyPoisonDamage()
+    {
+        int damage = 0;
+
+        foreach (Character enemy in LivingEnemies().ToList())
+        {
+            string id = GetEnemyId(enemy);
+            if (!poisonTurns.TryGetValue(id, out int turns) || turns <= 0)
+                continue;
+
+            enemy.TakeDamage(2);
+            damage += 2;
+            turns--;
+            if (turns == 0)
+            {
+                poisonTurns.Remove(id);
+                ClearStatus(id, "Poisoned");
+            }
+            else
+            {
+                poisonTurns[id] = turns;
+            }
+        }
+
+        SyncEnemyState();
+        return damage;
+    }
+
+    private void ApplyStatus(Character enemy, string status, int turns)
+    {
+        string id = GetEnemyId(enemy);
+        if (status == "Poisoned")
+            poisonTurns[id] = Math.Max(turns, poisonTurns.TryGetValue(id, out int current) ? current : 0);
+
+        if (!State.StatusEffects.TryGetValue(id, out List<string>? statuses))
+            State.StatusEffects[id] = statuses = new List<string>();
+
+        if (!statuses.Contains(status, StringComparer.Ordinal))
+            statuses.Add(status);
+    }
+
+    private void SetStatus(string actorId, string status)
+    {
+        if (!State.StatusEffects.TryGetValue(actorId, out List<string>? statuses))
+            State.StatusEffects[actorId] = statuses = new List<string>();
+
+        if (!statuses.Contains(status, StringComparer.Ordinal))
+            statuses.Add(status);
+    }
+
+    private void ClearStatus(string actorId, string status)
+    {
+        if (!State.StatusEffects.TryGetValue(actorId, out List<string>? statuses))
+            return;
+
+        statuses.Remove(status);
+        if (statuses.Count == 0)
+            State.StatusEffects.Remove(actorId);
+    }
+
+    public bool HasStatus(string combatantId, string status) =>
+        State.StatusEffects.TryGetValue(combatantId, out List<string>? statuses) &&
+        statuses.Contains(status, StringComparer.Ordinal);
 
     private bool TryUseHealingItem(PartyMember actor)
     {
