@@ -1,4 +1,5 @@
 using System.Drawing;
+using Systemic.Engine.State;
 
 public sealed class MinimapRenderer
 {
@@ -9,7 +10,7 @@ public sealed class MinimapRenderer
         using Pen border = new(Color.FromArgb(170, context.Profile.WallHighlight.R, context.Profile.WallHighlight.G, context.Profile.WallHighlight.B), 1);
         g.DrawRectangle(border, bounds);
 
-        int cell = Math.Max(2, Math.Min(bounds.Width / context.World.Width, bounds.Height / context.World.Height));
+        int cell = Math.Max(2, Math.Min(bounds.Width / GameWorld.Width, bounds.Height / GameWorld.Height));
         int ox = bounds.X + (bounds.Width - cell * context.World.Width) / 2;
         int oy = bounds.Y + (bounds.Height - cell * context.World.Height) / 2;
 
