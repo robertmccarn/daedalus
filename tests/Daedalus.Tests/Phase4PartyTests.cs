@@ -302,6 +302,10 @@ public class Phase4PartyTests
 
             Assert.Equal(formation, party.Formation);
             AssertValidParty(party, world, 4, "sera");
+
+            (int dx, int dy, CharacterDirection direction) = FindWalkableDirection(world, party.LeaderPosition);
+            Assert.Equal(MoveResult.Moved, party.TryMoveLeader(direction, manager.ActiveExpedition));
+            AssertValidParty(party, world, 4, "sera");
         }
     }
 
@@ -329,6 +333,126 @@ public class Phase4PartyTests
 
         AssertValidParty(party, world, 4, "sera");
         Assert.Equal(new GridPosition(world.SpawnX, world.SpawnY), party.LeaderPosition);
+        Assert.Equal(PartyFormationType.Defensive, party.Formation);
+    }
+
+    [Fact]
+    public void SaveLoad_ReconstructsRuntimePartyForNonFirstLeader()
+    {
+        GameWorld world = new(seed: 1122);
+        GameStateManager manager = new();
+        manager.StartNewExpedition(
+            world.SpawnX,
+            world.SpawnY,
+            30,
+            30,
+            floorSeed: world.FloorSeed,
+            selectedMemberIds: ["arden", "lyra", "marek", "sera"],
+            leaderId: "sera",
+            formation: PartyFormationType.Wedge);
+
+        PartyController party = new(world);
+        party.Initialize(manager.ActiveExpedition, new GridPosition(world.SpawnX, world.SpawnY));
+
+        (int dx, int dy, CharacterDirection direction) = FindWalkableDirection(world, party.LeaderPosition);
+        Assert.Equal(MoveResult.Moved, party.TryMoveLeader(direction, manager.ActiveExpedition));
+
+        string path = Path.Combine(Path.GetTempPath(), $"daedalus-phase4-runtime-{Guid.NewGuid():N}.json");
+        try
+        {
+            Assert.True(manager.Save(path));
+
+            GameStateManager loaded = new();
+            Assert.True(loaded.Load(path));
+
+            GameWorld loadedWorld = new(seed: loaded.ActiveExpedition.FloorSeed);
+            loadedWorld.RebuildFloor(
+                loaded.ActiveExpedition.FloorSeed,
+                loaded.ActiveExpedition.CurrentFloor);
+            PartyController loadedParty = new(loadedWorld);
+            loadedParty.Load(
+                loaded.ActiveExpedition,
+                new GridPosition(
+                    loaded.ActiveExpedition.PlayerGridPosition.X,
+                    loaded.ActiveExpedition.PlayerGridPosition.Y));
+
+            AssertValidParty(loadedParty, loadedWorld, 4, "sera");
+            Assert.Equal(PartyFormationType.Wedge, loadedParty.Formation);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Phase4PartyLifecycle_PreservesPartyThroughSaveAndExtraction()
+    {
+        GameWorld world = new(seed: 3344);
+        GameStateManager manager = new();
+        manager.StartNewExpedition(
+            world.SpawnX,
+            world.SpawnY,
+            30,
+            30,
+            floorSeed: world.FloorSeed,
+            selectedMemberIds: ["arden", "lyra", "marek", "sera"],
+            leaderId: "sera",
+            formation: PartyFormationType.Defensive);
+
+        PartyController party = new(world);
+        party.Initialize(manager.ActiveExpedition, new GridPosition(world.SpawnX, world.SpawnY));
+
+        foreach (CharacterDirection direction in FindWalkableDirections(world, party.LeaderPosition, 4))
+        {
+            MoveResult result = party.TryMoveLeader(direction, manager.ActiveExpedition);
+            if (result == MoveResult.Moved)
+                AssertValidParty(party, world, 4, "sera");
+        }
+
+        MoraleSystem.ApplyEvent(manager.ActiveExpedition, MoraleEventType.LootFound);
+        ExtractionSystem.ApplyReward(
+            manager.Campaign,
+            manager.ActiveExpedition,
+            new RewardBundle
+            {
+                Gold = 25,
+                Materials =
+                {
+                    new Material { Id = "monster-residue", Name = "Monster Residue", Quantity = 1 }
+                }
+            });
+
+        string path = Path.Combine(Path.GetTempPath(), $"daedalus-phase4-e2e-{Guid.NewGuid():N}.json");
+        try
+        {
+            Assert.True(manager.Save(path));
+
+            GameStateManager loaded = new();
+            Assert.True(loaded.Load(path));
+
+            PartyMember loadedLeader = loaded.ActiveExpedition.Party
+                .Single(member => member.Id == "sera");
+
+            Assert.Equal(100, loadedLeader.Morale);
+            Assert.Equal(25, loaded.ActiveExpedition.CarriedGold);
+            Assert.Contains(
+                loaded.ActiveExpedition.CarriedMaterials,
+                material => material.Id == "monster-residue");
+
+            Assert.True(ExtractionSystem.Extract(loaded));
+            Assert.Equal("Extracted", loaded.ActiveExpedition.ExtractionState);
+            Assert.Equal(25, loaded.Campaign.Gold);
+            Assert.Contains(
+                loaded.Campaign.Materials,
+                material => material.Id == "monster-residue");
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     private static void AssertValidParty(
