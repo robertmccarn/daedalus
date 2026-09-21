@@ -13,7 +13,8 @@ public sealed class ExplorationRenderContext
     public FeedbackEffect? Feedback { get; }
     public int CameraX { get; }
     public int CameraY { get; }
-    public int TileSize { get; } = 28;
+    public int TileSize => Layout.TileSize;
+    public ViewportLayout Layout { get; }
     public BiomeType Biome => BiomeCatalog.ForFloor(World.Floor);
     public WorldPresentationProfile Profile => WorldPresentationProfile.ForBiome(Biome);
 
@@ -25,7 +26,8 @@ public sealed class ExplorationRenderContext
         Func<int, int, bool> isCellVisible,
         string currentObjective,
         string message,
-        FeedbackEffect? feedback)
+        FeedbackEffect? feedback,
+        ViewportLayout layout)
     {
         World = world;
         Party = party;
@@ -35,10 +37,11 @@ public sealed class ExplorationRenderContext
         CurrentObjective = currentObjective;
         Message = message;
         Feedback = feedback;
+        Layout = layout;
 
         GridPosition leader = party.LeaderPosition;
-        CameraX = leader.X * TileSize - 420;
-        CameraY = leader.Y * TileSize - 300;
+        CameraX = leader.X * TileSize - Layout.WorldViewport.Width / 2;
+        CameraY = leader.Y * TileSize - Layout.WorldViewport.Height / 2;
     }
 
     public Point ToScreen(GridPosition position) =>
@@ -47,7 +50,10 @@ public sealed class ExplorationRenderContext
     public bool Visible(GridPosition position)
     {
         Point p = ToScreen(position);
-        return p.X >= -TileSize * 2 && p.X <= 860 &&
-               p.Y >= -TileSize * 2 && p.Y <= 620;
+        Rectangle viewport = Layout.WorldViewport;
+        return p.X >= viewport.Left - TileSize * 2 &&
+               p.X <= viewport.Right + TileSize &&
+               p.Y >= viewport.Top - TileSize * 2 &&
+               p.Y <= viewport.Bottom + TileSize;
     }
 }
