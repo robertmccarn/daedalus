@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'DOTNETCSHARP'">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\game\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)bin\game\</BaseOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Daedalus.Tests'">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\tests\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)bin\tests\</BaseOutputPath>
+  </PropertyGroup>
+</Project>
