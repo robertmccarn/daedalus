@@ -16,26 +16,33 @@ public sealed class WorldRenderer
         int minY = Math.Max(0, leader.Y - radiusY);
         int maxY = Math.Min(GameWorld.Height - 1, leader.Y + radiusY);
 
+        List<(int X, int Y)> cells = new();
         for (int y = minY; y <= maxY; y++)
-        {
             for (int x = minX; x <= maxX; x++)
+                cells.Add((x, y));
+
+        foreach ((int x, int y) in cells.OrderBy(cell =>
+            RenderDepth.Terrain(
+                world.Dungeon[cell.Y, cell.X].Elevation,
+                cell.Y,
+                world.Dungeon[cell.Y, cell.X].DrawLayer,
+                cell.X)))
+        {
+            Point screen = context.ToScreen(new GridPosition(x, y));
+
+            if (!context.IsDiscovered(x, y))
             {
-                Point screen = context.ToScreen(new GridPosition(x, y));
+                using Brush fog = new SolidBrush(Color.FromArgb(246, 7, 9, 12));
+                g.FillRectangle(fog, screen.X, screen.Y, context.TileSize + 1, context.TileSize + 1);
+                continue;
+            }
 
-                if (!context.IsDiscovered(x, y))
-                {
-                    using Brush fog = new SolidBrush(Color.FromArgb(246, 7, 9, 12));
-                    g.FillRectangle(fog, screen.X, screen.Y, context.TileSize + 1, context.TileSize + 1);
-                    continue;
-                }
+            DrawTile(g, context, x, y, world.Dungeon[y, x], p, now);
 
-                DrawTile(g, context, x, y, world.Dungeon[y, x], p, now);
-
-                if (!context.IsVisible(x, y))
-                {
-                    using Brush memoryShade = new SolidBrush(Color.FromArgb(118, 4, 7, 9));
-                    g.FillRectangle(memoryShade, screen.X, screen.Y, context.TileSize + 1, context.TileSize + 1);
-                }
+            if (!context.IsVisible(x, y))
+            {
+                using Brush memoryShade = new SolidBrush(Color.FromArgb(118, 4, 7, 9));
+                g.FillRectangle(memoryShade, screen.X, screen.Y, context.TileSize + 1, context.TileSize + 1);
             }
         }
     }
