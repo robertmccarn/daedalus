@@ -14,6 +14,7 @@ public class GameWorld
     public List<InteractiveProp> Props { get; private set; } = new();
     public List<StaticUnit> StaticUnits { get; private set; } = new();
     public List<DungeonNode> Nodes { get; private set; } = new();
+    public List<WorldVisualFeature> VisualFeatures { get; private set; } = new();
 
     public int Floor { get; private set; } = 1;
     public int FloorSeed { get; private set; }
@@ -57,7 +58,9 @@ public class GameWorld
         Props = new List<InteractiveProp>();
         StaticUnits = new List<StaticUnit>();
         Nodes = new List<DungeonNode>();
+        VisualFeatures = new List<WorldVisualFeature>();
 
+        CreateVisualFeatures();
         CreateEnemies();
         CreateProps();
         CreateNodes();
@@ -151,6 +154,52 @@ public class GameWorld
                 node.IsCompleted = true;
             }
         }
+    }
+
+    private void CreateVisualFeatures()
+    {
+        // The first room is a deterministic visual reference chamber. These features
+        // are render-only metadata: they intentionally do not modify collision.
+        AddFeature(WorldVisualFeatureType.Doorway, SpawnX, SpawnY - 4, 3, 1, 3, 0);
+
+        AddFeature(WorldVisualFeatureType.Pillar, SpawnX - 5, SpawnY - 4, 1, 1, 2, 0);
+        AddFeature(WorldVisualFeatureType.Pillar, SpawnX + 5, SpawnY - 4, 1, 1, 2, 1);
+        AddFeature(WorldVisualFeatureType.Pillar, SpawnX - 5, SpawnY + 2, 1, 1, 1, 2);
+        AddFeature(WorldVisualFeatureType.Pillar, SpawnX + 5, SpawnY + 2, 1, 1, 1, 3);
+
+        AddFeature(WorldVisualFeatureType.Abyss, SpawnX - 6, SpawnY + 3, 13, 2, 0, Floor % 2);
+        AddFeature(WorldVisualFeatureType.Bridge, SpawnX - 2, SpawnY + 2, 5, 2, 2, 0);
+
+        AddFeature(WorldVisualFeatureType.BrokenWall, SpawnX - 6, SpawnY - 3, 2, 1, 2, 0);
+        AddFeature(WorldVisualFeatureType.BrokenWall, SpawnX + 4, SpawnY - 3, 2, 1, 2, 1);
+
+        AddFeature(WorldVisualFeatureType.Rubble, SpawnX - 4, SpawnY, 2, 2, 1, 0);
+        AddFeature(WorldVisualFeatureType.Rubble, SpawnX + 3, SpawnY + 1, 2, 2, 1, 1);
+        AddFeature(WorldVisualFeatureType.Rubble, SpawnX - 3, SpawnY - 2, 2, 1, 0, 2);
+
+        AddFeature(WorldVisualFeatureType.Landmark, SpawnX + 5, SpawnY - 1, 1, 2, 4, Floor % 3);
+    }
+
+    private void AddFeature(
+        WorldVisualFeatureType type,
+        int x,
+        int y,
+        int width,
+        int height,
+        int elevation,
+        int variant)
+    {
+        if (x < -width || x >= Width || y < -height || y >= Height)
+            return;
+
+        VisualFeatures.Add(new WorldVisualFeature(
+            type,
+            Math.Clamp(x, 0, Width - 1),
+            Math.Clamp(y, 0, Height - 1),
+            width,
+            height,
+            elevation,
+            variant));
     }
 
     private void CreateEnemies()
