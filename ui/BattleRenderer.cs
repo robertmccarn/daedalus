@@ -187,8 +187,7 @@ public class BattleRenderer : IDisposable
         string id,
         float alpha,
         bool hit,
-        long now,
-        BattleSystem battle)
+        long now)
     {
         using Brush shadow = new SolidBrush(Color.FromArgb((int)(100 * alpha), 0, 0, 0));
         g.FillEllipse(shadow, x - 3, y + 46, 58, 13);
@@ -259,7 +258,8 @@ public class BattleRenderer : IDisposable
         bool selected,
         float alpha,
         bool hit,
-        long now)
+        long now,
+        BattleSystem battle)
     {
         using Brush shadow = new SolidBrush(Color.FromArgb((int)(100 * alpha), 0, 0, 0));
         g.FillEllipse(shadow, x - 3, y + 48, 58, 13);
