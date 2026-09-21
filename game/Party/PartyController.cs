@@ -163,10 +163,11 @@ public sealed class PartyController
         HashSet<GridPosition> occupied = new() { leaderPosition };
         IReadOnlyList<GridPosition> offsets = FormationOffsets.GetOffsets(Formation, leader.Direction, Math.Max(0, members.Count - 1));
 
-        for (int i = 1; i < members.Count; i++)
+        IReadOnlyList<PartyMemberRuntime> followers = GetFollowers();
+        for (int i = 0; i < followers.Count; i++)
         {
-            PartyMemberRuntime follower = members[i];
-            GridPosition desired = Add(leaderPosition, offsets[i - 1]);
+            PartyMemberRuntime follower = followers[i];
+            GridPosition desired = Add(leaderPosition, offsets[i]);
             GridPosition resolved = ResolvePosition(
                 follower,
                 desired,
@@ -191,11 +192,12 @@ public sealed class PartyController
         IReadOnlyList<PartyHistoryEntry> historySnapshot = history.ToArray();
         IReadOnlyList<GridPosition> offsets = FormationOffsets.GetOffsets(Formation, leader.Direction, Math.Max(0, members.Count - 1));
 
-        for (int i = 1; i < members.Count; i++)
+        IReadOnlyList<PartyMemberRuntime> followers = GetFollowers();
+        for (int i = 0; i < followers.Count; i++)
         {
-            PartyMemberRuntime follower = members[i];
+            PartyMemberRuntime follower = followers[i];
             GridPosition historicalLeader = GetHistoricalLeaderPosition(historySnapshot, i);
-            GridPosition desired = Add(historicalLeader, offsets[i - 1]);
+            GridPosition desired = Add(historicalLeader, offsets[i]);
             intents.Add(new FollowerMovementIntent(follower.MemberId, follower.Position, desired));
         }
 
@@ -222,6 +224,9 @@ public sealed class PartyController
             occupied.Add(resolved);
         }
     }
+
+    private IReadOnlyList<PartyMemberRuntime> GetFollowers() =>
+        members.Where(member => member.MemberId != LeaderId).ToList();
 
     private GridPosition ResolvePosition(
         PartyMemberRuntime follower,
