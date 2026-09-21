@@ -62,7 +62,7 @@ public class BattleRenderer : IDisposable
         g.FillEllipse(glow, 250, 150, 320, 270);
     }
 
-    private static void DrawParty(Graphics g, WorldPresentationProfile p, BattleSystem battle)
+    private void DrawParty(Graphics g, WorldPresentationProfile p, BattleSystem battle)
     {
         int index = 0;
         foreach (PartyMember member in battle.Party.Take(4))
@@ -76,7 +76,7 @@ public class BattleRenderer : IDisposable
         }
     }
 
-    private static void DrawEnemies(Graphics g, WorldPresentationProfile p, BattleSystem battle)
+    private void DrawEnemies(Graphics g, WorldPresentationProfile p, BattleSystem battle)
     {
         int index = 0;
         foreach (Character enemy in battle.Enemies.Take(3))
@@ -121,7 +121,7 @@ public class BattleRenderer : IDisposable
         }
     }
 
-    private static void DrawActor(
+    private void DrawActor(
         Graphics g,
         WorldPresentationProfile p,
         string spriteId,
