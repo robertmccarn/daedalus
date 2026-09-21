@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,12 +6,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="tests/**/*.cs" />
-    <Compile Remove="obj/**/*.cs" />
-    <Compile Remove="bin/**/*.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="game/**/*.cs" />
+    <Compile Include="ui/**/*.cs" />
   </ItemGroup>
 
 </Project>
