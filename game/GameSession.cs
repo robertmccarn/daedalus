@@ -4,6 +4,7 @@ public class GameSession
 {
     private readonly GameLogic logic;
     private FeedbackEffect? feedback;
+    private bool landmarkIntroduced;
 
     public GameWorld World { get; }
     public PartyController Party { get; }
@@ -61,6 +62,7 @@ public class GameSession
             SynchronizeExpedition();
             UpdateVisibility();
             SetFeedback(FeedbackEffectType.Discovery, position);
+            CheckLandmarkDiscovery(position);
 
             if (StateManager.ActiveExpedition.TurnCount % 12 == 0)
                 TriggerExplorationEvent();
@@ -349,6 +351,7 @@ public class GameSession
         State = GameState.Exploration;
         Battle = null;
         feedback = null;
+        landmarkIntroduced = false;
         Message = "The expedition enters the ruins.";
     }
 
@@ -446,6 +449,26 @@ public class GameSession
 
     private void SetFeedback(FeedbackEffectType type, GridPosition position, int durationMs = 900) =>
         feedback = new FeedbackEffect(type, position.X, position.Y, Environment.TickCount64, durationMs);
+
+    private void CheckLandmarkDiscovery(GridPosition position)
+    {
+        if (landmarkIntroduced)
+            return;
+
+        WorldVisualFeature? landmark = World.VisualFeatures
+            .FirstOrDefault(feature => feature.Type == WorldVisualFeatureType.Landmark);
+
+        if (landmark == null)
+            return;
+
+        int distance = Math.Abs(landmark.X - position.X) + Math.Abs(landmark.Y - position.Y);
+        if (distance > 3 || !IsCellVisible(landmark.X, landmark.Y))
+            return;
+
+        landmarkIntroduced = true;
+        Message = "A dormant resonance cuts through the ruin. Something ancient is still listening.";
+        SetFeedback(FeedbackEffectType.Discovery, new GridPosition(landmark.X, landmark.Y), 1400);
+    }
 
     private void SyncCompatibilityPlayer()
     {
