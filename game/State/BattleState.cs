@@ -10,6 +10,7 @@ public sealed class BattleState
     public string Description { get; set; } = "Choose an action.";
     public int TurnIndex { get; set; }
     public List<string> TurnOrder { get; set; } = new();
+    public Dictionary<string, List<string>> StatusEffects { get; set; } = new();
 }
 
 public sealed class BattleEnemyState
