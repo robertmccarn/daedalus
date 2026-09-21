@@ -22,11 +22,12 @@ public class ExplorationRenderer : IDisposable
         Func<int, int, bool> isCellDiscovered,
         Func<int, int, bool> isCellVisible,
         string currentObjective,
-        string message)
+        string message,
+        FeedbackEffect? feedback)
     {
         ExplorationRenderContext context = new(
             world, party, expedition, isCellDiscovered, isCellVisible,
-            currentObjective, message);
+            currentObjective, message, feedback);
 
         List<RenderItem> renderItems =
         new()
