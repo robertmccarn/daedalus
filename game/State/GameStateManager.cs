@@ -15,7 +15,8 @@ public class GameStateManager
     public void StartNewExpedition(
         int startX, int startY, int health, int maxHealth, int floor = 1, int? floorSeed = null,
         IReadOnlyCollection<string>? selectedMemberIds = null, string? leaderId = null,
-        PartyFormationType formation = PartyFormationType.Column)
+        PartyFormationType formation = PartyFormationType.Column,
+        Func<int, int, bool>? isVisible = null)
     {
         List<PartyMember> selected = SelectPartyMembers(selectedMemberIds);
         string selectedLeaderId = leaderId ?? selected[0].Id;
@@ -35,9 +36,18 @@ public class GameStateManager
         ActiveExpedition.Health = leader.HP;
         ActiveExpedition.MaxHealth = leader.MaxHP;
 
-        // Reveal the starting chamber, not the surrounding route. This makes the
-        // reference room immediately readable while preserving exploration fog.
-        DiscoverArea(startX, startY, radius: 5);
+        if (isVisible == null)
+        {
+            // Compatibility path for callers that do not own a visibility model.
+            DiscoverArea(startX, startY, radius: 5);
+        }
+        else
+        {
+            for (int y = Math.Max(0, startY - 7); y <= Math.Min(GameWorld.Height - 1, startY + 7); y++)
+            for (int x = Math.Max(0, startX - 7); x <= Math.Min(GameWorld.Width - 1, startX + 7); x++)
+                if (isVisible(x, y))
+                    MarkDiscovered(x, y);
+        }
     }
 
     public void StartNewExpedition()
@@ -52,7 +62,11 @@ public class GameStateManager
         ActiveExpedition.Health = health;
         ActiveExpedition.MaxHealth = maxHealth;
         PartyMember? leader = ActiveExpedition.Party.FirstOrDefault(member => member.Id == ActiveExpedition.LeaderId);
-        if (leader != null) { leader.HP = health; leader.MaxHP = maxHealth; }
+        if (leader != null)
+        {
+            leader.HP = health;
+            leader.MaxHP = maxHealth;
+        }
         DiscoverArea(x, y);
     }
 
@@ -115,9 +129,17 @@ public class GameStateManager
 
     public bool TrySave(string path, out string? error)
     {
-        try { SaveSystem.Save(path, Campaign, ActiveExpedition); error = null; return true; }
+        try
+        {
+            SaveSystem.Save(path, Campaign, ActiveExpedition);
+            error = null;
+            return true;
+        }
         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-        { error = ex.Message; return false; }
+        {
+            error = ex.Message;
+            return false;
+        }
     }
 
     public bool Load(string path)
