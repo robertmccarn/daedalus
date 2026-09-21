@@ -1,5 +1,7 @@
 # DAEDALUS — Visual Production Technical Implementation Plan
 
+<!-- CI validation branch: visual benchmark frame/depth/environment pass -->
+
 > Execution plan for the next production phase.
 >
 > **Priority:** visual quality over new gameplay systems.
