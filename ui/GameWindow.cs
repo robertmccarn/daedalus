@@ -46,30 +46,26 @@ public class GameWindow : Form
                     return true;
                 }
                 break;
+
             case GameState.ExtractionResults:
-                if (key == Keys.Enter || key == Keys.Space)
+                if (key is Keys.Enter or Keys.Space)
                 {
                     session.ReturnToCampaign();
                     Invalidate();
                     return true;
                 }
                 break;
+
             case GameState.Campaign:
-                if (key == Keys.Enter || key == Keys.Space)
-                {
-                    session.StartNewExpeditionFromCampaign();
-                    Invalidate();
-                    return true;
-                }
-                break;
             case GameState.GameOver:
-                if (key == Keys.Enter || key == Keys.Space)
+                if (key is Keys.Enter or Keys.Space)
                 {
                     session.StartNewExpeditionFromCampaign();
                     Invalidate();
                     return true;
                 }
                 break;
+
             case GameState.Exploration:
                 if (HandleExplorationInput(key))
                 {
@@ -84,49 +80,76 @@ public class GameWindow : Form
 
     private bool HandleExplorationInput(Keys key)
     {
-        if (e.KeyCode == Keys.C)
+        if (key == Keys.C)
         {
             ShowStats();
-            return;
+            return true;
         }
 
-        if (e.KeyCode == Keys.X)
+        if (key == Keys.X)
         {
             session.ExtractExpedition();
-            return;
+            return true;
         }
 
-        if (e.KeyCode == Keys.E)
+        if (key == Keys.E)
         {
             session.Interact();
-            return;
+            return true;
         }
 
-        CharacterDirection? direction = e.KeyCode switch
+        CharacterDirection? direction = key switch
         {
-            Keys.W => CharacterDirection.Up,
-            Keys.S => CharacterDirection.Down,
-            Keys.A => CharacterDirection.Left,
-            Keys.D => CharacterDirection.Right,
+            Keys.W or Keys.Up => CharacterDirection.Up,
+            Keys.S or Keys.Down => CharacterDirection.Down,
+            Keys.A or Keys.Left => CharacterDirection.Left,
+            Keys.D or Keys.Right => CharacterDirection.Right,
             _ => null
         };
 
-        if (direction.HasValue)
-            session.MoveLeader(direction.Value);
+        if (!direction.HasValue)
+            return false;
+
+        session.MoveLeader(direction.Value);
+        return true;
     }
 
-    private void HandleBattleInput(KeyEventArgs e)
+    private bool HandleBattleInput(Keys key)
     {
-        if (e.KeyCode == Keys.Escape)
+        if (key == Keys.Escape)
+        {
             session.CancelBattle();
-        else if (e.KeyCode == Keys.W)
+            return true;
+        }
+
+        // Command selection: W/S or Up/Down.
+        if (key is Keys.W or Keys.Up)
+        {
             session.SelectPreviousBattleCommand();
-        else if (e.KeyCode == Keys.S)
+            return true;
+        }
+
+        if (key is Keys.S or Keys.Down)
+        {
             session.SelectNextBattleCommand();
-        else if (e.KeyCode == Keys.A)
+            return true;
+        }
+
+        // Confirm: A, Enter, or Space.
+        if (key is Keys.A or Keys.Enter or Keys.Space)
+        {
             session.PerformBattleCommand();
-        else if (e.KeyCode == Keys.D)
+            return true;
+        }
+
+        // Target cycling: D/Left/Right.
+        if (key is Keys.D or Keys.Left or Keys.Right)
+        {
             session.SelectNextBattleTarget();
+            return true;
+        }
+
+        return false;
     }
 
     private void ShowStats()
