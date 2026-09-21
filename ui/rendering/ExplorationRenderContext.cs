@@ -44,6 +44,28 @@ public sealed class ExplorationRenderContext
         CameraY = leader.Y * TileSize - Layout.WorldViewport.Height / 2;
     }
 
+    public ExplorationRenderContext(
+        GameWorld world,
+        PartyController party,
+        ExpeditionState expedition,
+        Func<int, int, bool> isCellDiscovered,
+        Func<int, int, bool> isCellVisible,
+        string currentObjective,
+        string message,
+        FeedbackEffect? feedback)
+        : this(
+            world,
+            party,
+            expedition,
+            isCellDiscovered,
+            isCellVisible,
+            currentObjective,
+            message,
+            feedback,
+            ViewportLayout.ForClientSize(1100, 700))
+    {
+    }
+
     public Point ToScreen(GridPosition position) =>
         new(position.X * TileSize - CameraX, position.Y * TileSize - CameraY);
 
