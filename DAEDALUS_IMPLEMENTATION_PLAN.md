@@ -1290,3 +1290,36 @@ That room becomes the production benchmark for:
 - combat presentation
 
 Once that benchmark is convincing, the rest of the project becomes an exercise in extending a proven visual and gameplay language rather than inventing the game piecemeal.
+
+
+---
+
+# 23. Sprint 1 Status — Reference Room Reconstruction
+
+## Completed in the first implementation batch
+
+The current branch now includes the first visual reconstruction pass:
+
+- removed the strongest alternating checkerboard floor treatment
+- added deterministic stone-slab and fracture variation
+- increased masonry and wall-surface variation
+- added deeper abyss silhouettes and internal atmospheric depth cues
+- made ruin features sort by elevation before world Y
+- made static units and interactive props sort by elevation before world Y
+- made party members and enemies render using their logical tile elevation
+- tightened the exploration HUD footer so controls remain inside the intended panel
+
+This is an incremental visual pass, not the completion of the benchmark room.
+
+## Still required for Gate A
+
+- authored large environment assets
+- stronger vertical architecture
+- a more substantial landmark focal point
+- true foreground obstruction/occlusion
+- localized environmental lighting
+- stronger abyss depth and parallax
+- production character art
+- final camera composition
+
+The next work should continue from this state rather than restarting the renderer.
