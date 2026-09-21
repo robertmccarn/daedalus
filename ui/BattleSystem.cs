@@ -187,6 +187,17 @@ public sealed class BattleSystem
         }
 
         enemyDamage = PerformEnemyPhase();
+
+        if (LivingEnemies().Count == 0)
+        {
+            IsFinished = true;
+            PlayerWon = true;
+            CurrentPhase = BattlePhase.Victory;
+            CurrentTurn = BattleTurn.Player;
+            CommandMessage += " The last hostile succumbs.";
+            return BattleResult.EnemyDefeated;
+        }
+
         if (LivingParty().Count == 0)
         {
             IsFinished = true;
@@ -354,6 +365,12 @@ public sealed class BattleSystem
     public bool HasStatus(string combatantId, string status) =>
         State.StatusEffects.TryGetValue(combatantId, out List<string>? statuses) &&
         statuses.Contains(status, StringComparer.Ordinal);
+
+    public bool HasStatus(PartyMember member, string status) =>
+        HasStatus(member.Id, status);
+
+    public bool HasStatus(Character enemy, string status) =>
+        HasStatus(GetEnemyId(enemy), status);
 
     private bool TryUseHealingItem(PartyMember actor)
     {
