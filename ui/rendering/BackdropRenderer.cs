@@ -6,6 +6,7 @@ public sealed class BackdropRenderer
     public void Draw(Graphics g, ExplorationRenderContext context)
     {
         WorldPresentationProfile p = context.Profile;
+        long now = AnimationClock.Now;
         g.Clear(p.Void);
 
         using LinearGradientBrush gradient = new(
@@ -20,7 +21,8 @@ public sealed class BackdropRenderer
         using Brush distant = new SolidBrush(Color.FromArgb(95, p.Wall.R, p.Wall.G, p.Wall.B));
         for (int i = 0; i < 9; i++)
         {
-            int x = 20 + i * 105;
+            int drift = (int)MathF.Round(AnimationClock.Sine(now, 9000 + i * 220, i * 317) * 3f);
+            int x = 20 + i * 105 + drift;
             int height = 90 + (i * 37 % 150);
             g.FillRectangle(distant, x, 330 - height, 58, height);
             g.FillRectangle(distant, x - 12, 300 - height, 82, 18);
@@ -34,9 +36,19 @@ public sealed class BackdropRenderer
         }
 
         // The teal/biome light is deliberately localized rather than a global glow.
-        using Brush light = new SolidBrush(Color.FromArgb(42, p.Accent.R, p.Accent.G, p.Accent.B));
+        float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 2400);
+        using Brush light = new SolidBrush(Color.FromArgb(
+            34 + (int)(14 * pulse),
+            p.Accent.R,
+            p.Accent.G,
+            p.Accent.B));
         g.FillEllipse(light, 610, 55, 230, 230);
-        using Brush core = new SolidBrush(Color.FromArgb(70, p.Accent.R, p.Accent.G, p.Accent.B));
-        g.FillEllipse(core, 685, 105, 95, 95);
+
+        using Brush core = new SolidBrush(Color.FromArgb(
+            52 + (int)(24 * pulse),
+            p.Accent.R,
+            p.Accent.G,
+            p.Accent.B));
+        g.FillEllipse(core, 685 - (int)(pulse * 3), 105 - (int)(pulse * 3), 95 + (int)(pulse * 6), 95 + (int)(pulse * 6));
     }
 }
