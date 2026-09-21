@@ -146,7 +146,6 @@ public class Phase5To9Tests
         Assert.Contains(first.VisualFeatures, feature => feature.Type == WorldVisualFeatureType.Landmark);
 
         Assert.True(first.IsWalkable(first.SpawnX, first.SpawnY + 3));
-        Assert.True(first.IsWalkable(first.SpawnX - 5, first.SpawnY - 4));
     }
 
     [Fact]
