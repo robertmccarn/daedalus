@@ -36,14 +36,25 @@ public class GameWindow : Form
 
     private void HandleKeyDown(object? sender, KeyEventArgs e)
     {
-        if (session.State == GameState.Battle)
+        switch (session.State)
         {
-            HandleBattleInput(e);
-            return;
+            case GameState.Battle:
+                HandleBattleInput(e);
+                break;
+            case GameState.ExtractionResults:
+                if (e.KeyCode == Keys.Enter) session.ReturnToCampaign();
+                break;
+            case GameState.Campaign:
+                if (e.KeyCode == Keys.Enter) session.StartNewExpeditionFromCampaign();
+                break;
+            case GameState.GameOver:
+                if (e.KeyCode == Keys.Enter) session.StartNewExpeditionFromCampaign();
+                break;
+            case GameState.Exploration:
+                HandleExplorationInput(e);
+                break;
         }
-
-        if (session.State == GameState.Exploration)
-            HandleExplorationInput(e);
+        Invalidate();
     }
 
     private void HandleExplorationInput(KeyEventArgs e)
@@ -57,14 +68,12 @@ public class GameWindow : Form
         if (e.KeyCode == Keys.X)
         {
             session.ExtractExpedition();
-            Invalidate();
             return;
         }
 
         if (e.KeyCode == Keys.E)
         {
             session.Interact();
-            Invalidate();
             return;
         }
 
@@ -78,10 +87,7 @@ public class GameWindow : Form
         };
 
         if (direction.HasValue)
-        {
             session.MoveLeader(direction.Value);
-            Invalidate();
-        }
     }
 
     private void HandleBattleInput(KeyEventArgs e)
@@ -96,10 +102,6 @@ public class GameWindow : Form
             session.PerformBattleCommand();
         else if (e.KeyCode == Keys.D)
             session.SelectNextBattleTarget();
-        else
-            return;
-
-        Invalidate();
     }
 
     private void ShowStats()
@@ -122,10 +124,12 @@ public class GameWindow : Form
             session.StateManager.ActiveExpedition,
             session.State,
             session.Battle,
+            session.LastExtraction,
             session.Message,
             session.CurrentObjective,
             session.IsCellDiscovered,
-            session.IsCellVisible);
+            session.IsCellVisible,
+            session.StateManager);
     }
 
     protected override void Dispose(bool disposing)
