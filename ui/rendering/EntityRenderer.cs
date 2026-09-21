@@ -5,9 +5,10 @@ public sealed class EntityRenderer
     public void Draw(Graphics g, ExplorationRenderContext context)
     {
         foreach (PartyRenderData member in context.Party.GetRenderData(context.Expedition)
-                     .OrderBy(x => x.Position.Y)
-                     .ThenBy(x => x.Position.X)
-                     .ThenBy(x => x.PartySlot))
+                     .OrderBy(member => GetElevation(context, member.Position.X, member.Position.Y))
+                     .ThenBy(member => member.Position.Y)
+                     .ThenBy(member => member.Position.X)
+                     .ThenBy(member => member.PartySlot))
         {
             if (!context.IsDiscovered(member.Position.X, member.Position.Y) ||
                 !context.IsVisible(member.Position.X, member.Position.Y) ||
@@ -17,22 +18,34 @@ public sealed class EntityRenderer
             DrawPartyMember(g, context, member);
         }
 
-        foreach (Character enemy in context.World.Enemies.OrderBy(x => x.Y).ThenBy(x => x.X))
+        foreach (Character enemy in context.World.Enemies
+                     .OrderBy(enemy => GetElevation(context, enemy.X, enemy.Y))
+                     .ThenBy(enemy => enemy.Y)
+                     .ThenBy(enemy => enemy.X))
         {
             GridPosition pos = new(enemy.X, enemy.Y);
-            if (!context.IsDiscovered(enemy.X, enemy.Y) || !context.IsVisible(enemy.X, enemy.Y) || !context.Visible(pos))
+            if (!context.IsDiscovered(enemy.X, enemy.Y) ||
+                !context.IsVisible(enemy.X, enemy.Y) ||
+                !context.Visible(pos))
                 continue;
 
             DrawEnemy(g, context, enemy);
         }
     }
 
+    private static int GetElevation(ExplorationRenderContext context, int x, int y) =>
+        x >= 0 && y >= 0 && y < context.World.Dungeon.GetLength(0) &&
+        x < context.World.Dungeon.GetLength(1)
+            ? context.World.Dungeon[y, x].Elevation
+            : 0;
+
     private static void DrawPartyMember(Graphics g, ExplorationRenderContext c, PartyRenderData member)
     {
         Point s = c.ToScreen(member.Position);
+        int lift = GetElevation(c, member.Position.X, member.Position.Y) * 4;
         int bob = member.AnimationState == CharacterAnimationState.Walk &&
                   member.AnimationTick % 2 == 1 ? -2 : 0;
-        Point origin = new(s.X, s.Y + bob);
+        Point origin = new(s.X, s.Y + bob - lift);
 
         Color accent = member.IsLeader
             ? c.Profile.Accent
@@ -45,7 +58,7 @@ public sealed class EntityRenderer
             };
 
         using Brush shadow = new SolidBrush(Color.FromArgb(105, 0, 0, 0));
-        g.FillEllipse(shadow, origin.X + 2, origin.Y + 21, 25, 7);
+        g.FillEllipse(shadow, origin.X + 2, origin.Y + 21 + lift, 25, 7);
 
         switch (member.SpriteId.ToLowerInvariant())
         {
@@ -74,13 +87,15 @@ public sealed class EntityRenderer
     {
         using Brush cloak = new SolidBrush(accent);
         using Brush darkCloak = new SolidBrush(Color.FromArgb(
-            Math.Max(0, accent.R - 28), Math.Max(0, accent.G - 28), Math.Max(0, accent.B - 28)));
+            Math.Max(0, accent.R - 28),
+            Math.Max(0, accent.G - 28),
+            Math.Max(0, accent.B - 28)));
 
         Point[] body =
         {
-            new Point(s.X + 4, s.Y + 10), new Point(s.X + 8, s.Y + 7),
-            new Point(s.X + 20, s.Y + 7), new Point(s.X + 24, s.Y + 11),
-            new Point(s.X + 21, s.Y + 24), new Point(s.X + 7, s.Y + 24)
+            new(s.X + 4, s.Y + 10), new(s.X + 8, s.Y + 7),
+            new(s.X + 20, s.Y + 7), new(s.X + 24, s.Y + 11),
+            new(s.X + 21, s.Y + 24), new(s.X + 7, s.Y + 24)
         };
         g.FillPolygon(cloak, body);
         g.FillRectangle(darkCloak, s.X + 10, s.Y + 13, 7, 11);
@@ -98,9 +113,9 @@ public sealed class EntityRenderer
         using Brush robe = new SolidBrush(accent);
         Point[] body =
         {
-            new Point(s.X + 13, s.Y + 8), new Point(s.X + 20, s.Y + 14),
-            new Point(s.X + 23, s.Y + 24), new Point(s.X + 5, s.Y + 24),
-            new Point(s.X + 8, s.Y + 14)
+            new(s.X + 13, s.Y + 8), new(s.X + 20, s.Y + 14),
+            new(s.X + 23, s.Y + 24), new(s.X + 5, s.Y + 24),
+            new(s.X + 8, s.Y + 14)
         };
         g.FillPolygon(robe, body);
 
@@ -111,6 +126,7 @@ public sealed class EntityRenderer
         using Pen staff = new(Color.FromArgb(215, c.Profile.WarmLight.R, c.Profile.WarmLight.G, c.Profile.WarmLight.B), 2);
         int staffX = direction == CharacterDirection.Left ? s.X + 4 : s.X + 22;
         g.DrawLine(staff, staffX, s.Y + 6, staffX, s.Y + 26);
+
         using Brush gem = new SolidBrush(Color.FromArgb(220, c.Profile.Accent.R, c.Profile.Accent.G, c.Profile.Accent.B));
         g.FillEllipse(gem, staffX - 3, s.Y + 3, 6, 6);
     }
@@ -118,7 +134,9 @@ public sealed class EntityRenderer
     private static void DrawMarek(Graphics g, ExplorationRenderContext c, Point s, Color accent, CharacterDirection direction)
     {
         using Brush armor = new SolidBrush(Color.FromArgb(
-            Math.Min(255, accent.R + 18), Math.Min(255, accent.G + 13), Math.Min(255, accent.B + 5)));
+            Math.Min(255, accent.R + 18),
+            Math.Min(255, accent.G + 13),
+            Math.Min(255, accent.B + 5)));
 
         g.FillRectangle(armor, s.X + 4, s.Y + 9, 20, 16);
         g.FillRectangle(armor, s.X + 1, s.Y + 11, 5, 10);
@@ -143,9 +161,9 @@ public sealed class EntityRenderer
         using Brush cloak = new SolidBrush(accent);
         Point[] body =
         {
-            new Point(s.X + 13, s.Y + 7), new Point(s.X + 19, s.Y + 10),
-            new Point(s.X + 21, s.Y + 24), new Point(s.X + 7, s.Y + 24),
-            new Point(s.X + 9, s.Y + 10)
+            new(s.X + 13, s.Y + 7), new(s.X + 19, s.Y + 10),
+            new(s.X + 21, s.Y + 24), new(s.X + 7, s.Y + 24),
+            new(s.X + 9, s.Y + 10)
         };
         g.FillPolygon(cloak, body);
 
@@ -186,23 +204,27 @@ public sealed class EntityRenderer
     private static void DrawEnemy(Graphics g, ExplorationRenderContext c, Character enemy)
     {
         Point s = c.ToScreen(new GridPosition(enemy.X, enemy.Y));
+        int lift = GetElevation(c, enemy.X, enemy.Y) * 4;
+        Point origin = new(s.X, s.Y - lift);
+
         using Brush shadow = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
-        g.FillEllipse(shadow, s.X + 3, s.Y + 20, 22, 7);
+        g.FillEllipse(shadow, origin.X + 3, origin.Y + 20 + lift, 22, 7);
 
         using Brush body = new SolidBrush(c.Profile.Hazard);
         Point[] silhouette =
         {
-            new Point(s.X + 6, s.Y + 7), new Point(s.X + 10, s.Y + 3),
-            new Point(s.X + 14, s.Y + 6), new Point(s.X + 18, s.Y + 3),
-            new Point(s.X + 23, s.Y + 7), new Point(s.X + 21, s.Y + 20),
-            new Point(s.X + 17, s.Y + 24), new Point(s.X + 8, s.Y + 22)
+            new(origin.X + 6, origin.Y + 7), new(origin.X + 10, origin.Y + 3),
+            new(origin.X + 14, origin.Y + 6), new(origin.X + 18, origin.Y + 3),
+            new(origin.X + 23, origin.Y + 7), new(origin.X + 21, origin.Y + 20),
+            new(origin.X + 17, origin.Y + 24), new(origin.X + 8, origin.Y + 22)
         };
         g.FillPolygon(body, silhouette);
 
         using Pen outline = new(c.Profile.Void, 2);
         g.DrawPolygon(outline, silhouette);
+
         using Brush eye = new SolidBrush(Color.FromArgb(245, 220, 185));
-        g.FillEllipse(eye, s.X + 9, s.Y + 10, 3, 3);
-        g.FillEllipse(eye, s.X + 17, s.Y + 10, 3, 3);
+        g.FillEllipse(eye, origin.X + 9, origin.Y + 10, 3, 3);
+        g.FillEllipse(eye, origin.X + 17, origin.Y + 10, 3, 3);
     }
 }

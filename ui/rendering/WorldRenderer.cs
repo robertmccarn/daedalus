@@ -29,6 +29,7 @@ public sealed class WorldRenderer
                 }
 
                 DrawTile(g, context, x, y, world.Dungeon[y, x], p);
+
                 if (!context.IsVisible(x, y))
                 {
                     using Brush memoryShade = new SolidBrush(Color.FromArgb(118, 4, 7, 9));
@@ -38,7 +39,13 @@ public sealed class WorldRenderer
         }
     }
 
-    private static void DrawTile(Graphics g, ExplorationRenderContext context, int x, int y, Tile tile, WorldPresentationProfile p)
+    private static void DrawTile(
+        Graphics g,
+        ExplorationRenderContext context,
+        int x,
+        int y,
+        Tile tile,
+        WorldPresentationProfile p)
     {
         Point s = context.ToScreen(new GridPosition(x, y));
         int z = tile.Elevation * 4;
@@ -49,24 +56,29 @@ public sealed class WorldRenderer
         {
             case TileType.Wall:
             case TileType.Pillar:
-                DrawWall(g, r, p, tile.Type == TileType.Pillar);
+                DrawWall(g, r, p, x, y, tile.Type == TileType.Pillar);
                 return;
+
             case TileType.StairsDown:
                 DrawFloor(g, r, p, x, y);
                 DrawStairs(g, r, p.Accent);
                 return;
+
             case TileType.StairsUp:
                 DrawFloor(g, r, p, x, y);
                 DrawStairs(g, r, p.WarmLight);
                 return;
+
             case TileType.Door:
                 DrawFloor(g, r, p, x, y);
                 DrawDoor(g, r, p);
                 return;
+
             case TileType.Water:
                 DrawFloor(g, r, p, x, y);
                 DrawWater(g, r, p, x, y);
                 return;
+
             default:
                 DrawFloor(g, r, p, x, y);
                 return;
@@ -75,52 +87,88 @@ public sealed class WorldRenderer
 
     private static void DrawFloor(Graphics g, Rectangle r, WorldPresentationProfile p, int x, int y)
     {
-        Color baseColor = ((x + y) & 1) == 0 ? p.Floor : p.FloorAlternate;
+        // Keep the logical tile grid, but remove the alternating checkerboard read.
+        // Subtle deterministic slab variation gives the floor an authored-stone feel.
+        int pattern = PositiveMod(x * 92821 + y * 68917, 31);
+        float tone = pattern switch
+        {
+            3 or 17 => 0.16f,
+            8 or 24 => 0.08f,
+            12 => 0.22f,
+            _ => 0.03f
+        };
+
+        Color baseColor = Blend(p.Floor, p.FloorAlternate, tone);
         using Brush fill = new SolidBrush(baseColor);
         g.FillRectangle(fill, r);
 
-        Color insetColor = Blend(baseColor, p.Void, 0.14f);
-        using Brush inset = new SolidBrush(insetColor);
+        using Brush inset = new SolidBrush(Blend(baseColor, p.Void, 0.22f));
         g.FillRectangle(inset, r.X + 2, r.Y + 2, r.Width - 4, r.Height - 4);
 
-        int pattern = PositiveMod(x * 92821 + y * 68917, 17);
-        using Pen seam = new(Color.FromArgb(40, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
-        if (pattern is 2 or 7 or 13) g.DrawLine(seam, r.X + 5, r.Y + 8, r.Right - 5, r.Y + 6);
-        if (pattern is 4 or 11) g.DrawLine(seam, r.X + 9, r.Y + 19, r.X + 17, r.Y + 22);
+        int slab = PositiveMod(x * 41 + y * 17, 5);
+        using Pen seam = new(Color.FromArgb(52, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
 
-        using Pen topEdge = new(Color.FromArgb(85, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
+        if (slab is 0 or 3)
+            g.DrawLine(seam, r.X + 3, r.Y + 8 + slab, r.Right - 4, r.Y + 6 + slab);
+
+        if (slab is 1 or 4)
+            g.DrawLine(seam, r.X + 7 + slab, r.Y + 3, r.X + 8, r.Bottom - 4);
+
+        if (pattern % 7 == 0)
+        {
+            using Pen fracture = new(Color.FromArgb(42, p.Void.R, p.Void.G, p.Void.B), 1);
+            g.DrawLine(fracture, r.X + 5, r.Y + 15, r.X + 11, r.Y + 19);
+            g.DrawLine(fracture, r.X + 11, r.Y + 19, r.X + 16, r.Y + 14);
+        }
+
+        using Pen topEdge = new(Color.FromArgb(72, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
         g.DrawLine(topEdge, r.X + 1, r.Y + 1, r.Right - 1, r.Y + 1);
     }
 
-    private static void DrawWall(Graphics g, Rectangle r, WorldPresentationProfile p, bool pillar)
+    private static void DrawWall(
+        Graphics g,
+        Rectangle r,
+        WorldPresentationProfile p,
+        int x,
+        int y,
+        bool pillar)
     {
         int extrusion = pillar ? 10 : 7;
-        using Brush shadow = new SolidBrush(Color.FromArgb(80, 0, 0, 0));
-        g.FillRectangle(shadow, r.X + 3, r.Bottom - 2, r.Width - 1, extrusion);
 
-        Color bodyColor = Blend(p.Wall, p.Void, 0.10f);
+        using Brush shadow = new SolidBrush(Color.FromArgb(90, 0, 0, 0));
+        g.FillRectangle(shadow, r.X + 3, r.Bottom - 1, r.Width - 1, extrusion);
+
+        Color bodyColor = Blend(p.Wall, p.Void, pillar ? 0.06f : 0.10f);
         using Brush body = new SolidBrush(bodyColor);
         g.FillRectangle(body, r);
 
         Point[] topPlane =
         {
-            new Point(r.X + 1, r.Y + 2), new Point(r.Right - 2, r.Y + 2),
-            new Point(r.Right - 5, r.Y + 7), new Point(r.X + 4, r.Y + 7)
+            new Point(r.X + 1, r.Y + 2),
+            new Point(r.Right - 2, r.Y + 2),
+            new Point(r.Right - 5, r.Y + 7),
+            new Point(r.X + 4, r.Y + 7)
         };
         using Brush top = new SolidBrush(Blend(p.WallHighlight, p.Wall, 0.55f));
         g.FillPolygon(top, topPlane);
 
-        using Brush face = new SolidBrush(Blend(p.Wall, p.Void, 0.28f));
+        using Brush face = new SolidBrush(Blend(p.Wall, p.Void, 0.30f));
         g.FillRectangle(face, r.X + 2, r.Bottom - 7, r.Width - 3, 7);
 
         using Pen edge = new(Color.FromArgb(175, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 1);
         g.DrawLine(edge, r.X + 1, r.Y + 2, r.Right - 2, r.Y + 2);
         g.DrawLine(edge, r.X + 2, r.Bottom - 7, r.Right - 2, r.Bottom - 7);
 
-        int notch = PositiveMod(r.X * 13 + r.Y * 29, 4);
-        if (notch == 1)
+        int seam = PositiveMod(x * 19 + y * 7, 5);
+        using Pen masonry = new(Color.FromArgb(42, p.Void.R, p.Void.G, p.Void.B), 1);
+        if (seam is 0 or 2)
+            g.DrawLine(masonry, r.X + 4, r.Y + 12, r.Right - 4, r.Y + 11);
+        if (seam == 4)
+            g.DrawLine(masonry, r.X + 8, r.Y + 5, r.X + 7, r.Bottom - 9);
+
+        if (PositiveMod(x * 13 + y * 29, 6) is 1 or 5)
         {
-            using Pen crack = new(Color.FromArgb(85, p.Void.R, p.Void.G, p.Void.B), 1);
+            using Pen crack = new(Color.FromArgb(82, p.Void.R, p.Void.G, p.Void.B), 1);
             g.DrawLine(crack, r.X + 7, r.Y + 10, r.X + 11, r.Y + 17);
             g.DrawLine(crack, r.X + 11, r.Y + 17, r.X + 8, r.Y + 23);
         }
@@ -130,8 +178,10 @@ public sealed class WorldRenderer
     {
         using Brush dark = new SolidBrush(Color.FromArgb(90, 0, 0, 0));
         g.FillRectangle(dark, r.X + 4, r.Y + 5, r.Width - 8, r.Height - 8);
+
         using Brush glow = new SolidBrush(Color.FromArgb(55, accent.R, accent.G, accent.B));
         g.FillRectangle(glow, r.X + 5, r.Y + 6, r.Width - 10, r.Height - 10);
+
         using Pen step = new(Color.FromArgb(190, accent.R, accent.G, accent.B), 1);
         for (int i = 0; i < 5; i++)
         {
@@ -144,10 +194,12 @@ public sealed class WorldRenderer
     {
         using Brush dark = new SolidBrush(Color.FromArgb(220, p.Void.R, p.Void.G, p.Void.B));
         g.FillRectangle(dark, r.X + 6, r.Y + 4, r.Width - 12, r.Height - 5);
+
         using Pen frame = new(Color.FromArgb(190, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 2);
         g.DrawLine(frame, r.X + 5, r.Bottom - 2, r.X + 5, r.Y + 8);
         g.DrawLine(frame, r.Right - 6, r.Bottom - 2, r.Right - 6, r.Y + 8);
         g.DrawArc(frame, r.X + 5, r.Y + 2, r.Width - 10, 19, 180, 180);
+
         using Pen inner = new(Color.FromArgb(130, p.Accent.R, p.Accent.G, p.Accent.B), 1);
         g.DrawLine(inner, r.X + 10, r.Bottom - 6, r.Right - 11, r.Bottom - 6);
     }
@@ -156,6 +208,7 @@ public sealed class WorldRenderer
     {
         using Brush water = new SolidBrush(Color.FromArgb(55, 85, 91));
         g.FillRectangle(water, r.X, r.Y, r.Width, r.Height);
+
         using Pen ripples = new(Color.FromArgb(80, p.Accent.R, p.Accent.G, p.Accent.B), 1);
         int pattern = PositiveMod(x * 31 + y * 17, 3);
         for (int i = 0; i < 2; i++)
@@ -168,11 +221,13 @@ public sealed class WorldRenderer
     private static Color Blend(Color source, Color target, float amount)
     {
         amount = Math.Clamp(amount, 0f, 1f);
-        return Color.FromArgb(source.A,
+        return Color.FromArgb(
+            source.A,
             source.R + (int)((target.R - source.R) * amount),
             source.G + (int)((target.G - source.G) * amount),
             source.B + (int)((target.B - source.B) * amount));
     }
 
-    private static int PositiveMod(int value, int divisor) => ((value % divisor) + divisor) % divisor;
+    private static int PositiveMod(int value, int divisor) =>
+        ((value % divisor) + divisor) % divisor;
 }
