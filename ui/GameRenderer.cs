@@ -30,6 +30,8 @@ public class GameRenderer : IDisposable
             battleRenderer.Draw(
                 graphics,
                 world,
+                party,
+                expedition,
                 battleEnemy,
                 message,
                 selectedCommand);
