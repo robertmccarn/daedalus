@@ -322,10 +322,13 @@ public sealed class EffectRenderer
 
     private static void DrawVignette(Graphics g, WorldPresentationProfile p)
     {
+        // Vignette is scoped to the playable world, not the HUD.
+        // The HUD remains crisp and unaffected by exploration atmosphere.
+        Rectangle viewport = ((ExplorationRenderContext?)g.Tag)?.Layout.WorldViewport ?? new Rectangle(0, 0, 860, 620);
         using Brush top = new SolidBrush(Color.FromArgb(55, p.Void.R, p.Void.G, p.Void.B));
         using Brush bottom = new SolidBrush(Color.FromArgb(80, p.Void.R, p.Void.G, p.Void.B));
-        g.FillRectangle(top, 0, 0, 860, 34);
-        g.FillRectangle(bottom, 0, 582, 860, 38);
+        g.FillRectangle(top, viewport.X, viewport.Y, viewport.Width, Math.Min(34, viewport.Height));
+        g.FillRectangle(bottom, viewport.X, Math.Max(viewport.Y, viewport.Bottom - Math.Min(38, viewport.Height)), viewport.Width, Math.Min(38, viewport.Height));
     }
 
     private static int PositiveMod(int value, int divisor) =>
