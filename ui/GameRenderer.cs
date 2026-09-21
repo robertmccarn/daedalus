@@ -8,6 +8,7 @@ public class GameRenderer : IDisposable
     private readonly ExtractionResultsRenderer extractionResultsRenderer;
     private readonly CampaignRenderer campaignRenderer;
     private readonly GameOverRenderer gameOverRenderer;
+    private readonly DevMenuRenderer devMenuRenderer = new();
 
     public GameRenderer(GameWorld world)
     {
@@ -31,8 +32,17 @@ public class GameRenderer : IDisposable
         string currentObjective,
         Func<int, int, bool> isCellDiscovered,
         Func<int, int, bool> isCellVisible,
-        GameStateManager stateManager)
+        GameStateManager stateManager,
+        bool devMenuOpen = false,
+        int devFloor = 1,
+        int devPartyLevel = 1)
     {
+        if (devMenuOpen)
+        {
+            devMenuRenderer.Draw(graphics, devFloor, devPartyLevel);
+            return;
+        }
+
         switch (gameState)
         {
             case GameState.Battle when battle != null:
@@ -63,5 +73,6 @@ public class GameRenderer : IDisposable
         extractionResultsRenderer.Dispose();
         campaignRenderer.Dispose();
         gameOverRenderer.Dispose();
+        devMenuRenderer.Dispose();
     }
 }
