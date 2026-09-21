@@ -22,13 +22,13 @@ public sealed class BattleSystem
 {
     private readonly ExpeditionState expedition;
     private readonly HashSet<string> defendingActors = new(StringComparer.Ordinal);
+    private readonly List<Character> defeatedEnemies = new();
     private int turnCursor;
 
     public BattleState State { get; }
     public IReadOnlyList<PartyMember> Party => State.Party;
-    public IReadOnlyList<Character> Enemies { get; private set; }
-    public Character Enemy => Enemies.First();
-    public IReadOnlyList<Character> DefeatedEnemies { get; } = new List<Character>();
+    public IReadOnlyList<Character> Enemies { get; }
+    public IReadOnlyList<Character> DefeatedEnemies => defeatedEnemies;
 
     public BattleTurn CurrentTurn { get; private set; } = BattleTurn.Player;
     public BattleCommand SelectedCommand { get; private set; } = BattleCommand.Attack;
@@ -42,35 +42,33 @@ public sealed class BattleSystem
             member.Id == State.SelectedActorId && member.HP > 0);
 
     public Character? SelectedTarget =>
-        Enemies.FirstOrDefault(enemy => enemy.Id == State.SelectedTargetId && enemy.HP > 0);
+        Enemies.FirstOrDefault(enemy =>
+            GetEnemyId(enemy) == State.SelectedTargetId && enemy.HP > 0);
 
-    public BattleSystem(
-        ExpeditionState expeditionState,
-        IReadOnlyList<Character> enemies)
+    public BattleSystem(ExpeditionState expeditionState, IReadOnlyList<Character> enemies)
     {
         expedition = expeditionState;
 
         if (expeditionState.Party.Count == 0)
             throw new InvalidOperationException("Battle requires at least one party member.");
-
         if (enemies.Count == 0)
             throw new InvalidOperationException("Battle requires at least one enemy.");
+
+        Enemies = enemies.ToList();
 
         State = new BattleState
         {
             Party = expeditionState.Party.ToList(),
-            Enemies = enemies.Select(ToEnemyState).ToList(),
+            Enemies = Enemies.Select((enemy, index) => ToEnemyState(enemy, index)).ToList(),
             SelectedCommand = BattleCommand.Attack.ToString(),
             Description = "Choose an action."
         };
-
-        Enemies = enemies.ToList();
 
         BattlePartyController controller = new(State);
         State.SelectedActorId = controller.State.TurnOrder
             .FirstOrDefault(id => IsLivingPartyMember(id)) ?? State.Party[0].Id;
 
-        State.SelectedTargetId = Enemies.First().Id;
+        State.SelectedTargetId = GetEnemyId(Enemies[0]);
         turnCursor = Math.Max(0, State.TurnOrder.IndexOf(State.SelectedActorId));
         CommandMessage = $"{SelectedActor?.Name ?? "Party"} is ready.";
     }
@@ -99,9 +97,9 @@ public sealed class BattleSystem
         List<Character> living = Enemies.Where(enemy => enemy.HP > 0).ToList();
         if (living.Count == 0) return;
 
-        int current = living.FindIndex(enemy => enemy.Id == State.SelectedTargetId);
+        int current = living.FindIndex(enemy => GetEnemyId(enemy) == State.SelectedTargetId);
         int next = current < 0 ? 0 : (current + 1) % living.Count;
-        State.SelectedTargetId = living[next].Id;
+        State.SelectedTargetId = GetEnemyId(living[next]);
         CommandMessage = $"Target: {living[next].Name}.";
         State.Description = CommandMessage;
     }
@@ -196,19 +194,16 @@ public sealed class BattleSystem
         return BattleResult.Continue;
     }
 
-    private int DealPlayerDamage(
-        PartyMember actor,
-        Character target,
-        int power,
-        string verb)
+    private int DealPlayerDamage(PartyMember actor, Character target, int power, string verb)
     {
         int damage = Math.Max(1, actor.Stats.Strength + power);
         target.TakeDamage(damage);
-
         CommandMessage = $"{actor.Name} {verb} {target.Name} for {damage} damage.";
+
         if (target.HP <= 0)
         {
-            ((List<Character>)DefeatedEnemies).Add(target);
+            if (!defeatedEnemies.Contains(target))
+                defeatedEnemies.Add(target);
             CommandMessage += $" {target.Name} falls.";
         }
 
@@ -219,8 +214,8 @@ public sealed class BattleSystem
     {
         CurrentPhase = BattlePhase.EnemyAction;
         CurrentTurn = BattleTurn.Enemy;
-
         int totalDamage = 0;
+
         foreach (Character enemy in LivingEnemies().ToList())
         {
             PartyMember? target = LivingParty()
@@ -288,10 +283,10 @@ public sealed class BattleSystem
         return false;
     }
 
-    private static BattleEnemyState ToEnemyState(Character enemy) =>
+    private static BattleEnemyState ToEnemyState(Character enemy, int index) =>
         new()
         {
-            Id = enemy.Id,
+            Id = GetEnemyId(enemy, index),
             Name = enemy.Name,
             HP = enemy.HP,
             MaxHP = enemy.MAXHP,
@@ -299,13 +294,20 @@ public sealed class BattleSystem
             Family = "Hollow"
         };
 
+    private static string GetEnemyId(Character enemy, int? index = null) =>
+        index.HasValue
+            ? $"{enemy.Name}:{enemy.X}:{enemy.Y}:{index.Value}"
+            : $"{enemy.Name}:{enemy.X}:{enemy.Y}";
+
     private void SyncEnemyState()
     {
         foreach (BattleEnemyState enemyState in State.Enemies)
         {
-            Character? enemy = Enemies.FirstOrDefault(candidate => candidate.Id == enemyState.Id);
-            if (enemy == null) continue;
+            Character? enemy = Enemies.FirstOrDefault(candidate =>
+                enemyState.Id == GetEnemyId(candidate) ||
+                enemyState.Name == candidate.Name);
 
+            if (enemy == null) continue;
             enemyState.HP = enemy.HP;
             enemyState.MaxHP = enemy.MAXHP;
         }
