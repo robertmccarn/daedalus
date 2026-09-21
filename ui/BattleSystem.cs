@@ -26,6 +26,7 @@ public sealed class BattleSystem
     private readonly Dictionary<Character, string> enemyIds = new();
     private readonly Dictionary<string, int> poisonTurns = new(StringComparer.Ordinal);
     private readonly HashSet<string> guardedActors = new(StringComparer.Ordinal);
+    private readonly BattleAnimationQueue animationQueue = new();
     private int selectedCommandIndex;
 
     public BattleState State { get; }
@@ -39,6 +40,9 @@ public sealed class BattleSystem
     public bool IsFinished { get; private set; }
     public bool PlayerWon { get; private set; }
     public string CommandMessage { get; private set; } = "Choose an action.";
+
+    public BattleAnimationEvent? GetActiveAnimation(long now) =>
+        animationQueue.GetActive(now);
 
     public PartyMember? SelectedActor =>
         IsCurrentPartyActor
@@ -187,6 +191,9 @@ public sealed class BattleSystem
                     target!,
                     GetBasePhysicalDamage(actor, 5),
                     "strikes");
+                QueuePlayerAnimation(BattleAnimationKind.Attack, actor, target!, playerDamage);
+                if (target!.HP <= 0)
+                    QueueAnimation(BattleAnimationKind.Defeat, actor.Id, GetEnemyId(target), playerDamage, 420);
                 actionResult = EvaluateBattleOutcome();
                 break;
 
@@ -203,6 +210,12 @@ public sealed class BattleSystem
 
                 CommandMessage = $"{actor.Name} uses a healing item.";
                 State.Description = CommandMessage;
+                animationQueue.Enqueue(
+                    BattleAnimationKind.Item,
+                    actor.Id,
+                    actor.Id,
+                    0,
+                    420);
                 actionResult = BattleResult.Continue;
                 break;
 
@@ -216,10 +229,22 @@ public sealed class BattleSystem
                 SetStatus(actor.Id, "Guarded");
                 CommandMessage = $"{actor.Name} braces for the incoming attack.";
                 State.Description = CommandMessage;
+                animationQueue.Enqueue(
+                    BattleAnimationKind.Defend,
+                    actor.Id,
+                    actor.Id,
+                    0,
+                    360);
                 actionResult = BattleResult.Continue;
                 break;
 
             case BattleCommand.Run:
+                animationQueue.Enqueue(
+                    BattleAnimationKind.Defend,
+                    actor.Id,
+                    actor.Id,
+                    0,
+                    260);
                 IsFinished = true;
                 PlayerWon = false;
                 CurrentPhase = BattlePhase.Escaped;
@@ -289,8 +314,24 @@ public sealed class BattleSystem
 
         damage = ApplyEnemyDamage(actor, target, rawDamage, skill.Verb);
 
+        BattleAnimationKind animationKind = skill.AppliesExposed
+            ? BattleAnimationKind.Expose
+            : BattleAnimationKind.Skill;
+        QueuePlayerAnimation(animationKind, actor, target, damage);
+
+        if (target.HP <= 0)
+            QueueAnimation(BattleAnimationKind.Defeat, actor.Id, GetEnemyId(target), damage, 420);
+
         if (target.HP > 0 && skill.AppliesPoison)
+        {
             ApplyStatus(target, "Poisoned", 2);
+            QueueAnimation(
+                BattleAnimationKind.PoisonTick,
+                actor.Id,
+                GetEnemyId(target),
+                0,
+                320);
+        }
 
         if (target.HP > 0 && skill.AppliesExposed)
             ApplyStatus(target, "Exposed", 1);
@@ -308,8 +349,22 @@ public sealed class BattleSystem
             return 0;
 
         int statusDamage = ApplyEnemyStartOfTurnEffects(enemy);
+        if (statusDamage > 0)
+            QueueAnimation(
+                BattleAnimationKind.PoisonTick,
+                GetEnemyId(enemy),
+                GetEnemyId(enemy),
+                statusDamage,
+                320);
+
         if (enemy.HP <= 0)
         {
+            QueueAnimation(
+                BattleAnimationKind.Defeat,
+                GetEnemyId(enemy),
+                GetEnemyId(enemy),
+                statusDamage,
+                420);
             SyncEnemyState();
             return statusDamage;
         }
@@ -322,8 +377,23 @@ public sealed class BattleSystem
         int damage = CalculateEnemyDamage(enemy, target, basePower);
         ApplyPartyDamage(enemy, target, damage);
 
+        QueueAnimation(
+            BattleAnimationKind.EnemyAttack,
+            GetEnemyId(enemy),
+            target.Id,
+            damage,
+            340);
+
         if (statusDamage > 0)
             CommandMessage += $" Poison deals {statusDamage} damage.";
+
+        if (target.HP <= 0)
+            QueueAnimation(
+                BattleAnimationKind.Defeat,
+                GetEnemyId(enemy),
+                target.Id,
+                damage,
+                420);
 
         return statusDamage + damage;
     }
@@ -413,6 +483,30 @@ public sealed class BattleSystem
 
         SyncEnemyState();
         return damage;
+    }
+
+    private void QueuePlayerAnimation(
+        BattleAnimationKind kind,
+        PartyMember actor,
+        Character target,
+        int damage)
+    {
+        animationQueue.Enqueue(
+            kind,
+            actor.Id,
+            GetEnemyId(target),
+            damage,
+            kind == BattleAnimationKind.Skill || kind == BattleAnimationKind.Expose ? 560 : 340);
+    }
+
+    private void QueueAnimation(
+        BattleAnimationKind kind,
+        string actorId,
+        string? targetId,
+        int damage,
+        int durationMs)
+    {
+        animationQueue.Enqueue(kind, actorId, targetId, damage, durationMs);
     }
 
     private void ApplyStatus(Character enemy, string status, int turns)
