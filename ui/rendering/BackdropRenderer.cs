@@ -39,20 +39,19 @@ public sealed class BackdropRenderer
             g.DrawLine(cracks, x, 80 + i * 19, x + 34, 160 + i * 21);
         }
 
-        // The teal/biome light is deliberately localized rather than a global glow.
+        // Keep the supernatural source localized around the benchmark focal zone.
+        // It scales with the world viewport instead of assuming a fixed 1100x700 frame.
         float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 2400);
-        using Brush light = new SolidBrush(Color.FromArgb(
-            34 + (int)(14 * pulse),
-            p.Accent.R,
-            p.Accent.G,
-            p.Accent.B));
-        g.FillEllipse(light, 610, 55, 230, 230);
+        Point source = new(
+            viewport.X + (int)(viewport.Width * 0.68f),
+            viewport.Y + (int)(viewport.Height * 0.27f));
+        LocalLightRenderer.Draw(g, source, Math.Max(70, (int)(Math.Min(viewport.Width, viewport.Height) * 0.18f)), 90, p.Accent, pulse * 0.18f);
 
-        using Brush core = new SolidBrush(Color.FromArgb(
-            52 + (int)(24 * pulse),
-            p.Accent.R,
-            p.Accent.G,
-            p.Accent.B));
-        g.FillEllipse(core, 685 - (int)(pulse * 3), 105 - (int)(pulse * 3), 95 + (int)(pulse * 6), 95 + (int)(pulse * 6));
+        using Pen sourceRay = new(Color.FromArgb(22 + (int)(12 * pulse), p.Accent.R, p.Accent.G, p.Accent.B), 1);
+        for (int i = -2; i <= 2; i++)
+        {
+            int endX = source.X + i * Math.Max(24, viewport.Width / 16);
+            g.DrawLine(sourceRay, source.X, source.Y, endX, viewport.Y + (int)(viewport.Height * 0.72f));
+        }
     }
 }
