@@ -68,17 +68,7 @@ public sealed class EffectRenderer
     }
 
     private static void DrawRadialLight(Graphics g, Point center, int diameter, int alpha, Color color)
-    {
-        for (int i = 4; i >= 1; i--)
-        {
-            float scale = i / 4f;
-            int size = Math.Max(2, (int)(diameter * scale));
-            int a = Math.Max(1, alpha * (5 - i) / 5);
-
-            using Brush glow = new SolidBrush(Color.FromArgb(a, color.R, color.G, color.B));
-            g.FillEllipse(glow, center.X - size / 2, center.Y - size / 2, size, size);
-        }
-    }
+        => LocalLightRenderer.Draw(g, center, diameter / 2, alpha, color);
 
     private static void DrawAbyssMotes(
         Graphics g,
@@ -183,14 +173,17 @@ public sealed class EffectRenderer
         WorldPresentationProfile p,
         long now)
     {
+        Rectangle viewport = context.Layout.WorldViewport;
+        int width = Math.Max(1, viewport.Width);
+        int height = Math.Max(1, viewport.Height);
         for (int i = 0; i < 32; i++)
         {
             float phase = AnimationClock.Phase(now, 5200 + i * 71, i * 313);
-            int x = 24 + PositiveMod(i * 97, 812) + (int)(MathF.Sin(phase * MathF.PI * 2f) * 10f);
-            int y = 28 + PositiveMod(i * 53, 548) - (int)(phase * 12f);
+            int x = viewport.X + 24 + PositiveMod(i * 97, Math.Max(1, width - 48)) + (int)(MathF.Sin(phase * MathF.PI * 2f) * 10f);
+            int y = viewport.Y + 28 + PositiveMod(i * 53, Math.Max(1, height - 56)) - (int)(phase * 12f);
 
-            if (y < 18)
-                y += 548;
+            if (y < viewport.Y + 18)
+                y += height - 28;
 
             int alpha = 22 + (int)(38 * (0.5f + 0.5f * MathF.Sin(phase * MathF.PI * 2f + i)));
             int size = i % 5 == 0 ? 3 : 2;
@@ -210,12 +203,11 @@ public sealed class EffectRenderer
         WorldPresentationProfile p,
         long now)
     {
-        _ = context;
-
+        Rectangle viewport = context.Layout.WorldViewport;
         for (int band = 0; band < 4; band++)
         {
             float phase = AnimationClock.Phase(now, 7200 + band * 500, band * 911);
-            int y = 145 + band * 112 + (int)(MathF.Sin(phase * MathF.PI * 2f) * 9f);
+            int y = viewport.Y + (int)(viewport.Height * (0.22f + band * 0.19f)) + (int)(MathF.Sin(phase * MathF.PI * 2f) * 9f);
             int alpha = 10 + (int)(8 * (0.5f + 0.5f * MathF.Sin(phase * MathF.PI * 2f)));
 
             using Brush mist = new SolidBrush(Color.FromArgb(
@@ -223,7 +215,7 @@ public sealed class EffectRenderer
                 p.Mist.R,
                 p.Mist.G,
                 p.Mist.B));
-            g.FillEllipse(mist, 80, y, 680, 22);
+            g.FillEllipse(mist, viewport.X + (int)(viewport.Width * 0.08f), y, Math.Max(20, (int)(viewport.Width * 0.84f)), 22);
         }
     }
 
