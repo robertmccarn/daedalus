@@ -7,6 +7,9 @@
 >
 > The current repository already contains working foundations for campaign state, party state, expedition state, visibility, exploration, combat, extraction, progression systems, and CI. The remaining problem is not primarily missing architecture. It is the gap between those systems and the visual / experiential game represented by the Daedalus concept board.
 
+
+> **Design-driven refactor overlay:** See [`DAEDALUS_GAME_DESIGN_REFACTOR_PLAN.md`](DAEDALUS_GAME_DESIGN_REFACTOR_PLAN.md) for the gameplay-analysis-derived refactor sequence. Use that plan to decide when architectural changes are justified by player decisions, risk, mastery, feedback, and iteration needs. Do not treat it as a separate production gate.
+
 ---
 
 ## 1. Product Target
