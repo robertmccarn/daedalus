@@ -119,6 +119,16 @@ public class GameSession
                 : FeedbackEffectType.Discovery,
             Party.LeaderPosition);
 
+        Recorder.Record(
+            GameplayEventType.ExplorationEvent,
+            StateManager.ActiveExpedition.CurrentFloor,
+            StateManager.ActiveExpedition.TurnCount,
+            Party.LeaderPosition.X,
+            Party.LeaderPosition.Y,
+            Party.LeaderId,
+            value: expeditionEvent.GoldDelta,
+            context: expeditionEvent.Id);
+
         SynchronizeExpedition();
     }
 
@@ -311,6 +321,14 @@ public class GameSession
         if (State == GameState.Battle)
         {
             MoraleSystem.ApplyEvent(StateManager.ActiveExpedition, MoraleEventType.Retreat);
+            Recorder.Record(
+                GameplayEventType.ExtractionChosen,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                Party.LeaderPosition.X,
+                Party.LeaderPosition.Y,
+                Party.LeaderId,
+                context: "battle-cancel");
             EndBattle();
         }
     }
