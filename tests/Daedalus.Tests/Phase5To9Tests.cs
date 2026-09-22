@@ -467,4 +467,61 @@ public class Phase5To9Tests
         Assert.True(manager.IsDiscovered(15, 5));
         Assert.False(manager.IsDiscovered(10, 0));
     }
+
+    [Fact]
+    public void GameplayRecorder_TracksStructuredEventsAndCounts()
+    {
+        GameplayRecorder recorder = new();
+
+        recorder.Record(
+            GameplayEventType.Movement,
+            floor: 1,
+            turn: 1,
+            x: 10,
+            y: 10,
+            actorId: "arden",
+            value: 1,
+            context: "Right");
+        recorder.Record(
+            GameplayEventType.BattleStarted,
+            floor: 1,
+            turn: 1,
+            x: 11,
+            y: 10,
+            actorId: "arden",
+            targetId: "Hollow Guard");
+
+        Assert.Equal(2, recorder.Events.Count);
+        Assert.Equal(1, recorder.CountByType()[GameplayEventType.Movement]);
+        Assert.Contains("BattleStarted", recorder.ToJsonLines());
+    }
+
+    [Fact]
+    public void GameplayScenario_IsDeterministicAndCompletesBenchmarkLoop()
+    {
+        GameplayScenarioResult first = GameplayScenario.RunBenchmark(12345);
+        GameplayScenarioResult second = GameplayScenario.RunBenchmark(12345);
+
+        Assert.True(first.Completed);
+        Assert.True(second.Completed);
+        Assert.Equal(first.Snapshot, second.Snapshot);
+        Assert.Equal(first.Events, second.Events);
+
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.ExpeditionStarted);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.Interaction && item.Context == "chest");
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.Interaction && item.Context == "terminal");
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.BattleStarted);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.BattleCommand);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.EnemyDefeated);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.RewardCollected);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.ExtractionChosen);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.ExpeditionEnded);
+
+        Assert.Equal("Extracted", first.Snapshot.ExtractionState);
+        Assert.True(first.Snapshot.CampaignRuns >= 1);
+        Assert.True(first.Snapshot.CampaignGold > 0);
+        Assert.True(first.Snapshot.TurnCount > 0);
+    }
+
+
 }
