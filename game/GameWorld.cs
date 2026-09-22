@@ -167,8 +167,8 @@ public class GameWorld
         AddFeature(WorldVisualFeatureType.Pillar, SpawnX - 5, SpawnY + 2, 1, 1, 1, 2);
         AddFeature(WorldVisualFeatureType.Pillar, SpawnX + 5, SpawnY + 2, 1, 1, 1, 3);
 
-        AddFeature(WorldVisualFeatureType.Abyss, SpawnX - 6, SpawnY + 3, 13, 2, 0, Floor % 2);
-        AddFeature(WorldVisualFeatureType.Bridge, SpawnX - 2, SpawnY + 2, 5, 2, 2, 0);
+        AddFeature(WorldVisualFeatureType.Abyss, SpawnX - 6, SpawnY + 3, 13, 3, 0, Floor % 2);
+        AddFeature(WorldVisualFeatureType.Bridge, SpawnX - 3, SpawnY + 2, 7, 2, 2, 0);
 
         AddFeature(WorldVisualFeatureType.BrokenWall, SpawnX - 6, SpawnY - 3, 2, 1, 2, 0);
         AddFeature(WorldVisualFeatureType.BrokenWall, SpawnX + 4, SpawnY - 3, 2, 1, 2, 1);
@@ -177,7 +177,7 @@ public class GameWorld
         AddFeature(WorldVisualFeatureType.Rubble, SpawnX + 3, SpawnY + 1, 2, 2, 1, 1);
         AddFeature(WorldVisualFeatureType.Rubble, SpawnX - 3, SpawnY - 2, 2, 1, 0, 2);
 
-        AddFeature(WorldVisualFeatureType.Landmark, SpawnX + 5, SpawnY - 1, 1, 2, 4, Floor % 3);
+        AddFeature(WorldVisualFeatureType.Landmark, SpawnX + 5, SpawnY - 1, 2, 3, 4, Floor % 3);
     }
 
     private void AddFeature(
