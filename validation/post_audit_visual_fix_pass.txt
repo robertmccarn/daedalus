@@ -1,0 +1,1 @@
+Validation marker for the post-audit visual fix pass.
