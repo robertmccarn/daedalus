@@ -15,6 +15,7 @@ public class GameSession
     public string Message { get; private set; }
     public GameStateManager StateManager { get; }
     public ExtractionSummary? LastExtraction { get; private set; }
+    public GameplayRecorder Recorder { get; }
     public FeedbackEffect? Feedback => feedback;
     public bool DevMenuOpen => devMenuOpen;
     public int DevSelectedFloor => devSelectedFloor;
@@ -25,7 +26,7 @@ public class GameSession
             ? "Reach the extraction point with something worth bringing back."
             : $"Reach the extraction point on depth {StateManager.ActiveExpedition.CurrentFloor}.";
 
-    public GameSession(GameWorld world)
+    public GameSession(GameWorld world, GameplayRecorder? recorder = null)
     {
         World = world;
         logic = new GameLogic();
@@ -33,7 +34,8 @@ public class GameSession
         Message = string.Empty;
         StateManager = new GameStateManager();
         Party = new PartyController(World);
-        StartNewExpeditionInternal();
+        Recorder = recorder ?? new GameplayRecorder();
+        StartNewExpeditionInternal(World.FloorSeed);
     }
 
     public MoveResult MovePlayer(int deltaX, int deltaY)
@@ -67,6 +69,15 @@ public class GameSession
             SynchronizeExpedition();
             UpdateVisibility();
             SetFeedback(FeedbackEffectType.Discovery, position);
+            Recorder.Record(
+                GameplayEventType.Movement,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                position.X,
+                position.Y,
+                Party.LeaderId,
+                value: 1,
+                context: direction.ToString());
             CheckLandmarkDiscovery(position);
 
             if (StateManager.ActiveExpedition.TurnCount % 12 == 0)
@@ -130,6 +141,24 @@ public class GameSession
                 CompleteNode(chest.X, chest.Y);
                 Message += " Supplies recovered.";
                 SetFeedback(FeedbackEffectType.Loot, leaderPosition);
+                Recorder.Record(
+                    GameplayEventType.Interaction,
+                    StateManager.ActiveExpedition.CurrentFloor,
+                    StateManager.ActiveExpedition.TurnCount,
+                    leaderPosition.X,
+                    leaderPosition.Y,
+                    Party.LeaderId,
+                    value: chest.Reward.Gold,
+                    context: "chest");
+                Recorder.Record(
+                    GameplayEventType.RewardCollected,
+                    StateManager.ActiveExpedition.CurrentFloor,
+                    StateManager.ActiveExpedition.TurnCount,
+                    leaderPosition.X,
+                    leaderPosition.Y,
+                    Party.LeaderId,
+                    value: chest.Reward.Gold,
+                    context: "chest");
             }
             RecordNodeVisit(chest.X, chest.Y);
             return;
@@ -151,6 +180,24 @@ public class GameSession
                 CompleteNode(terminal.X, terminal.Y);
                 Message += $" Restored {terminal.HealAmount} HP.";
                 SetFeedback(FeedbackEffectType.Heal, leaderPosition);
+                Recorder.Record(
+                    GameplayEventType.Interaction,
+                    StateManager.ActiveExpedition.CurrentFloor,
+                    StateManager.ActiveExpedition.TurnCount,
+                    leaderPosition.X,
+                    leaderPosition.Y,
+                    Party.LeaderId,
+                    value: terminal.HealAmount,
+                    context: "terminal");
+                Recorder.Record(
+                    GameplayEventType.RewardCollected,
+                    StateManager.ActiveExpedition.CurrentFloor,
+                    StateManager.ActiveExpedition.TurnCount,
+                    leaderPosition.X,
+                    leaderPosition.Y,
+                    Party.LeaderId,
+                    value: terminal.CoreReward.Charge,
+                    context: "terminal-core");
             }
             RecordNodeVisit(terminal.X, terminal.Y);
             return;
@@ -217,8 +264,7 @@ public class GameSession
             PartyMember source = StateManager.Campaign.PartyRoster.First(candidate => candidate.Id == member.Id);
             member.Level = source.Level;
             member.Experience = source.Experience;
-            member.MaxHP = source.MaxHP;
-            member.HP = source.MaxHP;
+            member.MaxHP = source.MaxHP;            member.HP = source.MaxHP;
             member.MaxMP = source.MaxMP;
             member.MP = source.MaxMP;
             member.Stats = new StatsData
@@ -273,9 +319,46 @@ public class GameSession
     {
         if (Battle == null || State != GameState.Battle) return;
 
+        string actorId = Battle.SelectedActor?.Id ?? string.Empty;
+        string targetId = Battle.SelectedTarget == null
+            ? string.Empty
+            : Battle.GetEnemyPresentationId(Battle.SelectedTarget);
+        BattleCommand command = Battle.SelectedCommand;
+
+        Recorder.Record(
+            GameplayEventType.BattleCommand,
+            StateManager.ActiveExpedition.CurrentFloor,
+            StateManager.ActiveExpedition.TurnCount,
+            Party.LeaderPosition.X,
+            Party.LeaderPosition.Y,
+            actorId,
+            string.IsNullOrEmpty(targetId) ? null : targetId,
+            context: command.ToString());
+
+        if (command == BattleCommand.Skill)
+            Recorder.Record(
+                GameplayEventType.AbilityUsed,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                Party.LeaderPosition.X,
+                Party.LeaderPosition.Y,
+                actorId,
+                string.IsNullOrEmpty(targetId) ? null : targetId,
+                context: "signature-skill");
+
         BattleResult result = Battle.PerformPlayerTurn(out _, out int enemyDamage);
         SynchronizeExpedition();
         Message = Battle.CommandMessage;
+
+        if (enemyDamage > 0)
+            Recorder.Record(
+                GameplayEventType.DamageTaken,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                Party.LeaderPosition.X,
+                Party.LeaderPosition.Y,
+                value: enemyDamage,
+                context: "battle");
 
         if (result == BattleResult.EnemyDefeated)
         {
@@ -290,6 +373,23 @@ public class GameSession
                     ProgressionSystem.ApplyExperience(partyMember, reward.Experience);
 
                 ExtractionSystem.ApplyReward(StateManager.Campaign, StateManager.ActiveExpedition, reward);
+                Recorder.Record(
+                    GameplayEventType.EnemyDefeated,
+                    StateManager.ActiveExpedition.CurrentFloor,
+                    StateManager.ActiveExpedition.TurnCount,
+                    defeatedEnemy.X,
+                    defeatedEnemy.Y,
+                    targetId: Battle.GetEnemyPresentationId(defeatedEnemy),
+                    value: reward.Experience,
+                    context: defeatedEnemy.Name);
+                Recorder.Record(
+                    GameplayEventType.RewardCollected,
+                    StateManager.ActiveExpedition.CurrentFloor,
+                    StateManager.ActiveExpedition.TurnCount,
+                    defeatedEnemy.X,
+                    defeatedEnemy.Y,
+                    value: reward.Experience,
+                    context: $"combat:{defeatedEnemy.Name}:gold={reward.Gold}:cores={reward.Cores.Sum(core => core.Quantity)}");
                 World.BeginEnemyDeath(defeatedEnemy);
                 CompleteNode(defeatedEnemy.X, defeatedEnemy.Y);
             }
@@ -315,12 +415,36 @@ public class GameSession
             Party.GetLeaderRuntime().IsDefeated = true;
             SynchronizeExpedition();
             SetFeedback(FeedbackEffectType.Danger, Party.LeaderPosition);
+            Recorder.Record(
+                GameplayEventType.Defeat,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                Party.LeaderPosition.X,
+                Party.LeaderPosition.Y,
+                Party.LeaderId,
+                context: "battle");
+            Recorder.Record(
+                GameplayEventType.ExpeditionEnded,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                Party.LeaderPosition.X,
+                Party.LeaderPosition.Y,
+                Party.LeaderId,
+                context: "defeated");
             return;
         }
 
         if (result == BattleResult.Escaped)
         {
             MoraleSystem.ApplyEvent(StateManager.ActiveExpedition, MoraleEventType.Retreat);
+            Recorder.Record(
+                GameplayEventType.ExtractionChosen,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                Party.LeaderPosition.X,
+                Party.LeaderPosition.Y,
+                Party.LeaderId,
+                context: "battle-retreat");
             EndBattle();
             return;
         }
@@ -342,6 +466,7 @@ public class GameSession
     public bool Load(string path)
     {
         if (!StateManager.Load(path)) return false;
+        Recorder.Clear();
         ExpeditionState expedition = StateManager.ActiveExpedition;
         World.RebuildFloor(expedition.FloorSeed, expedition.CurrentFloor);
         World.RestoreExpeditionState(expedition);
@@ -370,6 +495,16 @@ public class GameSession
 
         ExpeditionState expedition = StateManager.ActiveExpedition;
         int depth = expedition.CurrentFloor;
+
+        Recorder.Record(
+            GameplayEventType.ExtractionChosen,
+            expedition.CurrentFloor,
+            expedition.TurnCount,
+            Party.LeaderPosition.X,
+            Party.LeaderPosition.Y,
+            Party.LeaderId,
+            value: expedition.CarriedGold,
+            context: $"gold={expedition.CarriedGold};cores={expedition.CarriedCores.Count};materials={expedition.CarriedMaterials.Sum(material => material.Quantity)}");
         int gold = expedition.CarriedGold;
         int cores = expedition.CarriedCores.Count;
         int materials = expedition.CarriedMaterials.Sum(material => material.Quantity);
@@ -392,6 +527,14 @@ public class GameSession
         Message = $"Expedition extracted at depth {depth}. Upkeep settled: {upkeep}.";
         State = GameState.ExtractionResults;
         Battle = null;
+        Recorder.Record(
+            GameplayEventType.ExpeditionEnded,
+            depth,
+            expedition.TurnCount,
+            Party.LeaderPosition.X,
+            Party.LeaderPosition.Y,
+            Party.LeaderId,
+            context: "extracted");
         SetFeedback(FeedbackEffectType.Extraction, Party.LeaderPosition);
         return true;
     }
@@ -488,9 +631,9 @@ public class GameSession
         member.EquippedGearIds.Add(id);
     }
 
-    private void StartNewExpeditionInternal()
+    private void StartNewExpeditionInternal(int? seed = null)
     {
-        World.RebuildFloor(Random.Shared.Next(), 1);
+        World.RebuildFloor(seed ?? Random.Shared.Next(), 1);
         StateManager.StartNewExpedition(
             World.SpawnX, World.SpawnY, 30, 30, World.Floor, World.FloorSeed,
             StateManager.Campaign.PartyRoster.Take(4).Select(member => member.Id).ToArray(),
@@ -513,6 +656,15 @@ public class GameSession
         feedback = null;
         landmarkIntroduced = false;
         Message = "The expedition enters the ruins.";
+        Recorder.Record(
+            GameplayEventType.ExpeditionStarted,
+            StateManager.ActiveExpedition.CurrentFloor,
+            StateManager.ActiveExpedition.TurnCount,
+            World.SpawnX,
+            World.SpawnY,
+            StateManager.ActiveExpedition.LeaderId,
+            value: World.FloorSeed,
+            context: "new-expedition");
     }
 
     private void StartBattle(Character enemy)
@@ -534,6 +686,15 @@ public class GameSession
         State = GameState.Battle;
         Message = Battle.CommandMessage;
         SetFeedback(FeedbackEffectType.Danger, new GridPosition(enemy.X, enemy.Y));
+        Recorder.Record(
+            GameplayEventType.BattleStarted,
+            StateManager.ActiveExpedition.CurrentFloor,
+            StateManager.ActiveExpedition.TurnCount,
+            enemy.X,
+            enemy.Y,
+            Party.LeaderId,
+            targetId: enemy.Name,
+            context: $"enemies={battleEnemies.Count}");
     }
 
     private void EndBattle()
@@ -559,6 +720,14 @@ public class GameSession
         RecordNodeVisit(World.SpawnX, World.SpawnY);
         ApplyGearBonuses();
         Message = $"You descend to floor {expedition.CurrentFloor}.";
+        Recorder.Record(
+            GameplayEventType.FloorDescended,
+            expedition.CurrentFloor,
+            expedition.TurnCount,
+            World.SpawnX,
+            World.SpawnY,
+            Party.LeaderId,
+            value: expedition.CurrentFloor);
         UpdateVisibility();
         SetFeedback(FeedbackEffectType.Discovery, Party.LeaderPosition);
     }
@@ -579,8 +748,18 @@ public class GameSession
         DungeonNode? node = World.GetNodeAt(x, y);
         if (node == null) return;
         StateManager.ActiveExpedition.CurrentNode = node.Id;
-        if (!StateManager.ActiveExpedition.NodeHistory.Contains(node.Id))
+        bool firstVisit = !StateManager.ActiveExpedition.NodeHistory.Contains(node.Id);
+        if (firstVisit)
             StateManager.ActiveExpedition.NodeHistory.Add(node.Id);
+        if (firstVisit)
+            Recorder.Record(
+                GameplayEventType.Discovery,
+                StateManager.ActiveExpedition.CurrentFloor,
+                StateManager.ActiveExpedition.TurnCount,
+                x,
+                y,
+                Party.LeaderId,
+                context: $"{node.Type}:{node.Id}");
         DiscoverCell(x, y);
     }
 
