@@ -996,3 +996,6 @@ Before merging a visual commit, ask:
 If the answer is only “the architecture is cleaner,” it is not the next task.
 
 If the answer is “the room has more depth, stronger silhouettes, better lighting, clearer interaction, or more convincing materials,” it belongs in this phase.
+
+
+<!-- CI validation marker -->
