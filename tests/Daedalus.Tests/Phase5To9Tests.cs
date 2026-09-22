@@ -519,8 +519,9 @@ public class Phase5To9Tests
 
         Assert.Equal("Extracted", first.Snapshot.ExtractionState);
         Assert.True(first.Snapshot.CampaignRuns >= 1);
-        Assert.True(first.Snapshot.CampaignGold > 0);
+        Assert.True(first.Snapshot.CampaignGold >= 0);
         Assert.True(first.Snapshot.TurnCount > 0);
+        Assert.Contains(first.Events, item => item.Type == GameplayEventType.RewardCollected);
     }
 
 
