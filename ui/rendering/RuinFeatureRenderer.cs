@@ -11,7 +11,8 @@ public sealed class RuinFeatureRenderer
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         foreach (WorldVisualFeature feature in context.World.VisualFeatures
-                     .OrderBy(feature => RenderDepth.WorldObject(
+                     .OrderBy(feature => feature.Type == WorldVisualFeatureType.Abyss ? -1_000_000_000 : 0)
+                     .ThenBy(feature => RenderDepth.WorldObject(
                          feature.Elevation,
                          feature.Y,
                          feature.X,
@@ -85,12 +86,20 @@ public sealed class RuinFeatureRenderer
         g.FillPolygon(voidFill, rim);
 
         float pulse = 0.5f + 0.5f * AnimationClock.Sine(now, 2100, feature.Variant * 71);
-        using Brush depthGlow = new SolidBrush(Color.FromArgb(
-            24 + (int)(18 * pulse),
-            p.Accent.R,
-            p.Accent.G,
-            p.Accent.B));
-        g.FillEllipse(depthGlow, origin.X + width / 6, origin.Y + height / 4, width * 2 / 3, height / 2);
+        // Multiple nested planes establish actual vertical depth instead of a single black void.
+        for (int layer = 0; layer < 4; layer++)
+        {
+            int insetX = 8 + layer * Math.Max(4, width / 28);
+            int insetY = 10 + layer * Math.Max(3, height / 18);
+            int layerWidth = Math.Max(12, width - insetX * 2);
+            int layerHeight = Math.Max(12, height - insetY * 2);
+            int alpha = 34 + layer * 14 + (int)(pulse * 8);
+            using Brush depthLayer = new SolidBrush(Color.FromArgb(alpha, p.Accent.R, p.Accent.G, p.Accent.B));
+            g.FillEllipse(depthLayer, origin.X + insetX, origin.Y + insetY, layerWidth, layerHeight);
+        }
+
+        using Pen nearRim = new(Color.FromArgb(115, p.WallHighlight.R, p.WallHighlight.G, p.WallHighlight.B), 2);
+        g.DrawArc(nearRim, origin.X + 8, origin.Y + 8, Math.Max(10, width - 16), Math.Max(10, height - 16), 8, 164);
 
         // Distant vertical silhouettes drift at different speeds, creating a layered abyss.
         for (int i = 0; i < 5; i++)
@@ -101,7 +110,8 @@ public sealed class RuinFeatureRenderer
             int columnWidth = 7 + (i % 2) * 4;
             int columnHeight = Math.Max(18, height - (top - origin.Y) - 6);
 
-            using Brush silhouette = new SolidBrush(Color.FromArgb(120 - i * 10, 11, 18, 21));
+            int silhouetteAlpha = Math.Max(40, 120 - i * 14);
+            using Brush silhouette = new SolidBrush(Color.FromArgb(silhouetteAlpha, 11 + i * 2, 18 + i * 2, 21 + i * 2));
             g.FillRectangle(silhouette, sx, top, columnWidth, columnHeight);
 
             using Pen rimLight = new(Color.FromArgb(35 + i * 4, p.Accent.R, p.Accent.G, p.Accent.B), 1);
