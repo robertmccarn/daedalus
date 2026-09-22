@@ -19,9 +19,10 @@ public readonly record struct ViewportLayout(
         if (worldHeight + bottomSafeArea > clientHeight)
             worldHeight = Math.Max(1, clientHeight - bottomSafeArea);
 
+        int hudX = Math.Max(0, clientWidth - hudWidth);
         return new ViewportLayout(
             new Rectangle(0, 0, worldWidth, worldHeight),
-            new Rectangle(clientWidth - hudWidth, 0, hudWidth, clientHeight),
+            new Rectangle(hudX, 0, Math.Max(1, clientWidth - hudX), clientHeight),
             28,
             Math.Max(0, clientHeight - worldHeight));
     }
