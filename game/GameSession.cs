@@ -3,6 +3,7 @@ using Systemic.Engine.State;
 public class GameSession
 {
     private readonly GameLogic logic;
+    private readonly GameFlow flow;
     private FeedbackEffect? feedback;
     private bool landmarkIntroduced;
     private bool devMenuOpen;
@@ -10,7 +11,7 @@ public class GameSession
 
     public GameWorld World { get; }
     public PartyController Party { get; }
-    public GameState State { get; private set; }
+    public GameState State => flow.State;
     public BattleSystem? Battle { get; private set; }
     public string Message { get; private set; }
     public GameStateManager StateManager { get; }
@@ -30,7 +31,7 @@ public class GameSession
     {
         World = world;
         logic = new GameLogic();
-        State = GameState.Exploration;
+        flow = new GameFlow(GameState.Exploration);
         Message = string.Empty;
         StateManager = new GameStateManager();
         Party = new PartyController(World);
@@ -303,7 +304,7 @@ public class GameSession
         UpdateVisibility();
         ApplyGearBonuses();
 
-        State = GameState.Exploration;
+        flow.TransitionTo(GameState.Exploration);
         Battle = null;
         feedback = null;
         landmarkIntroduced = false;
@@ -428,7 +429,7 @@ public class GameSession
         if (result == BattleResult.PlayerDefeated)
         {
             Message = Battle.CommandMessage;
-            State = GameState.GameOver;
+            flow.TransitionTo(GameState.GameOver);
             StateManager.ActiveExpedition.ExtractionState = "Defeated";
             Party.GetLeaderRuntime().IsDefeated = true;
             SynchronizeExpedition();
@@ -491,7 +492,7 @@ public class GameSession
         Party.Load(expedition, new GridPosition(expedition.PlayerGridPosition.X, expedition.PlayerGridPosition.Y));
         SyncCompatibilityPlayer();
         ApplyGearBonuses();
-        State = GameState.Exploration;
+        flow.TransitionTo(GameState.Exploration);
         Battle = null;
         Message = "Expedition loaded.";
         UpdateVisibility();
@@ -543,7 +544,7 @@ public class GameSession
             StateManager.Campaign.RunsCompleted);
 
         Message = $"Expedition extracted at depth {depth}. Upkeep settled: {upkeep}.";
-        State = GameState.ExtractionResults;
+        flow.TransitionTo(GameState.ExtractionResults);
         Battle = null;
         Recorder.Record(
             GameplayEventType.ExpeditionEnded,
@@ -561,7 +562,7 @@ public class GameSession
     {
         if (State == GameState.ExtractionResults)
         {
-            State = GameState.Campaign;
+            flow.TransitionTo(GameState.Campaign);
             Message = "Expedition complete. Prepare the next descent.";
         }
     }
@@ -669,7 +670,7 @@ public class GameSession
         UpdateVisibility();
         ApplyGearBonuses();
 
-        State = GameState.Exploration;
+        flow.TransitionTo(GameState.Exploration);
         Battle = null;
         feedback = null;
         landmarkIntroduced = false;
@@ -701,7 +702,7 @@ public class GameSession
             StateManager.ActiveExpedition,
             battleEnemies,
             StateManager.Campaign);
-        State = GameState.Battle;
+        flow.TransitionTo(GameState.Battle);
         Message = Battle.CommandMessage;
         SetFeedback(FeedbackEffectType.Danger, new GridPosition(enemy.X, enemy.Y));
         Recorder.Record(
@@ -717,7 +718,7 @@ public class GameSession
 
     private void EndBattle()
     {
-        State = GameState.Exploration;
+        flow.TransitionTo(GameState.Exploration);
         Battle = null;
         SyncCompatibilityPlayer();
         UpdateVisibility();
