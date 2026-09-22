@@ -1,866 +1,995 @@
+# DAEDALUS — Unified Implementation Plan
 
-# DAEDALUS — Production Implementation Plan
-
-> **Authoritative implementation plan.**
+> **Single source of truth for production, game design, refactoring, visual development, and validation.**
 >
-> This document replaces the previous architecture-first approach with a production plan centered on a finished vertical slice.
+> This document consolidates the useful material from the former implementation, visual-production, fun-analysis, design-refactor, roadmap, and earlier Systemic architecture plans.
 >
-> The current repository already contains working foundations for campaign state, party state, expedition state, visibility, exploration, combat, extraction, progression systems, and CI. The remaining problem is not primarily missing architecture. It is the gap between those systems and the visual / experiential game represented by the Daedalus concept board.
-
-
-> **Design-driven refactor overlay:** See [`DAEDALUS_GAME_DESIGN_REFACTOR_PLAN.md`](DAEDALUS_GAME_DESIGN_REFACTOR_PLAN.md) for the gameplay-analysis-derived refactor sequence. Use that plan to decide when architectural changes are justified by player decisions, risk, mastery, feedback, and iteration needs. Do not treat it as a separate production gate.
+> The previous documents are intentionally retired after this consolidation. New work should be planned here rather than in a second roadmap.
 
 ---
 
-## 1. Product Target
+# 1. Product Direction
 
-Daedalus is a dark exploration RPG built around repeated expeditions into ancient ruins.
+Daedalus is a dark expedition RPG about repeatedly descending into ancient ruins with a persistent party.
 
-The target experience is:
+The intended core experience is:
 
-**Campaign → prepare party → enter ruins → explore → discover → interact → fight → loot → extract → return → improve → descend again**
+**Prepare → descend → explore → discover → assess risk → fight / avoid / interact → gain value → decide whether to push or extract → return → improve → prepare again**
 
-The visual target supplied for this project establishes the intended presentation:
+The game's identity should come from the interaction of four things:
 
-- dramatic ruined architecture
-- strong vertical depth
-- bridges over abyssal spaces
-- layered stone construction
-- warm firelight against cool darkness
-- supernatural teal energy
-- readable character silhouettes
-- environmental storytelling
-- tactical combat presentation
-- authored UI rather than debug panels
-- cohesive biome identity
+1. **Discovery** — the ruin contains information, landmarks, routes, and surprises.
+2. **Tactical mastery** — combat rewards learning enemy behavior and party interactions.
+3. **Expedition tension** — the more value the player carries, the more meaningful the decision to continue becomes.
+4. **Persistent ownership** — the party, equipment, knowledge, and campaign state make each expedition matter.
 
-The implementation plan must therefore optimize for **visible game quality**, not code volume.
+The target emotional question is:
+
+> **“I have gained something valuable. How much farther am I willing to go with what I have?”**
 
 ---
 
-# 2. Current Baseline
+# 2. Design Thesis
 
-## 2.1 What Already Works
+The project should optimize for **decision quality, not system count**.
 
-The current develop branch has a viable foundation:
+A feature is valuable when it creates a meaningful choice, consequence, lesson, or reason to replay.
 
-- campaign state and persistent roster
-- expedition state
+For every major feature, ask:
+
+> **What does the player decide because this exists?**
+
+Then:
+
+> **What can change because of that decision?**
+
+Then:
+
+> **What does the player learn?**
+
+Then:
+
+> **Why would they want to try again?**
+
+A feature that cannot answer those questions does not automatically deserve additional implementation depth.
+
+---
+
+# 3. Current Baseline
+
+The current build already provides a viable foundation:
+
+### Campaign / persistence
+- persistent party roster
+- campaign resources, gear, materials, cores, recipes
+- campaign flags and depth
+- extraction return flow
+- synthesis foundation
+
+### Expedition
+- active expedition state
 - four-person party runtime
-- fifth roster member
-- formation support
-- exploration movement
-- fog / discovery and line-of-sight visibility
+- leader and follower movement
+- formations
+- discovery / fog of war
 - minimap
-- interactable props
-- exploration events
-- extraction flow
-- campaign return / expedition restart
-- multi-enemy battle state
-- party turn handling
-- target selection
-- attack / skill / item / defend / run commands
-- poison and guarded status behavior
-- battle victory / defeat / escape states
-- extraction rewards
-- progression / morale / synthesis systems
-- authored ruin feature records
-- exploration feedback effects
-- CI build/test validation
+- carried inventory and rewards
+- upkeep
+- extraction
+- floor progression
+- morale
 
-The last verified commit at the time this plan was rewritten is:
-
-f94f9a2c922fe04dafb6d47a1082dfa312211014
-
-The associated GitHub Actions run completed successfully.
-
-## 2.2 What Is Not Yet Production Quality
-
-The current screenshot exposes the primary gap:
-
-### Environment
-The renderer currently communicates a tiled dungeon grid more strongly than an authored ancient ruin.
-
-### Characters
-The party is technically distinct but visually too small and procedural to carry character identity.
-
-### Depth
-Elevation and foreground behavior exist, but the scene still lacks the layered vertical composition of the target.
-
-### Atmosphere
-The current effects provide glow and feedback, but lighting does not yet substantially sculpt the environment.
-
-### UI
-The current HUD communicates useful state but still reads partially as a development interface. Some lower-screen instructions can clip at the current window size.
+### Exploration
+- generated dungeon topology
+- authored Ruined Depths benchmark room
+- chest
+- terminal
+- enemies
+- combat nodes
+- extraction node
+- landmark
+- visual features including bridge, abyss, pillars, rubble, doorway
 
 ### Combat
-The battle state is functional, but the presentation still needs to become a finished tactical scene.
+- party-versus-group combat
+- interleaved initiative
+- target selection
+- Attack / Skill / Item / Interact / Defend / Run
+- enemy behaviors
+- Poisoned / Exposed / Guarded states
+- character signature skills
+- gear and morale modifiers
+- victory / defeat / escape
+- battle animation events
 
-### Assets
-The project currently relies heavily on System.Drawing primitives. A production visual target requires an authored asset layer.
+### Presentation
+- structured exploration render passes
+- viewport layout
+- shared visual depth ordering
+- animated party presentation
+- authored environment primitives
+- layered abyss
+- local lighting
+- atmosphere
+- HUD
+- interaction feedback
+- extraction / campaign / game-over presentations
+
+### Developer validation
+- F1 dev menu
+- deterministic floor jump setup
+- level / gear normalization for test scenarios
+- automated test suite and CI
+
+The renderer and game-state foundations are no longer the primary blockers.
 
 ---
 
-# 3. Non-Negotiable Production Rules
+# 4. Current Design Diagnosis
+
+The project currently has **more systems than meaningful decisions**.
+
+## Exploration
+
+The game can currently:
+
+**move → reveal → interact → fight → continue**
+
+But movement is still often transit.
+
+The generated topology is primarily a connected route rather than a set of competing opportunities.
+
+The authored room is visually meaningful, but its gameplay structure remains comparatively predictable.
+
+### Design problem
+
+The player needs reasons to choose:
+
+- a safer route
+- a riskier route
+- a valuable route
+- an information-rich route
+- an optional encounter
+- an optional reward
+
+rather than simply choosing the shortest path toward the required endpoint.
+
+---
+
+## Combat
+
+Combat is the most mature decision system and has a good skeleton.
+
+However:
+
+- skills are still hard-coded around character identity
+- enemy behavior is inferred from names
+- status effects are string-based
+- battle rules, content, inventory behavior, morale, animation events, and messaging are concentrated in `BattleSystem`
+- the current command set is broader than the actual tactical decision space
+
+The intended direction is not “add lots of skills.”
+
+It is:
+
+> **Create more useful relationships between timing, targets, enemy behavior, statuses, party roles, and resources.**
+
+---
+
+## Expedition
+
+This is the most important design gap.
+
+The current game has:
+
+- carried rewards
+- HP loss
+- healing
+- morale
+- upkeep
+- floor progression
+- extraction
+- defeat
+
+But extraction is primarily an endpoint.
+
+The player needs a real opportunity to think:
+
+> **“I can leave now with this.”**
+
+versus:
+
+> **“I can risk this haul for something better.”**
+
+That push-your-luck decision should become the game's primary macro-level fun engine.
+
+---
+
+## Progression
+
+The current progression foundation mostly produces larger numbers:
+
+- level
+- stats
+- HP / MP
+- gear power
+- morale modifiers
+
+The target is progression that changes **how the player solves problems**, not merely how large the numbers are.
+
+---
+
+## Morale
+
+Morale has unusually strong thematic potential because it responds to:
+
+- victory
+- loot
+- rare loot
+- ally defeat
+- retreat
+- positive events
+- negative events
+
+It currently acts mostly as a numerical modifier.
+
+It should become meaningful only after the expedition-pressure experiment demonstrates where it helps.
+
+---
+
+## Events
+
+Events currently behave mostly as:
+
+**roll → outcome → message**
+
+They should eventually become:
+
+**situation → choice → consequence → information**
+
+But this should not become a giant narrative framework before the expedition loop is proven.
+
+---
+
+# 5. The Fun Model
+
+Daedalus should create four nested loops.
+
+## Moment loop
+
+**Input → action → feedback → state change**
+
+Examples:
+- move
+- interact
+- attack
+- defend
+- select target
+
+## Encounter loop
+
+**Observe → decide → act → consequence → adapt**
+
+Examples:
+- choose whether to engage
+- choose target
+- sequence abilities
+- spend healing
+- respond to enemy behavior
+
+## Expedition loop
+
+**Enter → discover → gain value → accumulate risk → reassess → extract / push**
+
+This is the signature loop.
+
+## Campaign loop
+
+**Return → evaluate haul → improve → prepare → descend again**
+
+This is where persistence converts one good expedition into the reason for another.
+
+---
+
+# 6. Primary Design Hypotheses
+
+These are hypotheses, not established player findings.
+
+### H1 — Push-your-luck creates expedition tension
+
+Tension should rise when:
+
+- carried value rises
+- resources fall
+- danger rises
+- future rewards improve
+
+### H2 — Enemy behavior creates mastery
+
+Combat becomes more satisfying when players learn patterns they can exploit.
+
+### H3 — Party identity creates ownership
+
+Characters should solve problems differently rather than merely have different numbers.
+
+### H4 — Meaningful choices create replayability
+
+Different decisions should produce materially different situations and outcomes.
+
+### H5 — Knowledge is progression
+
+An experienced player should be able to make better choices even when given the same party and equipment as a new player.
+
+---
+
+# 7. Production Rules
 
 ## Rule 1 — Vertical slice before expansion
 
-Do not build four polished biomes before one biome works.
-
-Do not build every menu before one expedition is excellent.
-
-Do not add systems merely because they may be needed later.
-
----
+One excellent biome and expedition loop comes before broad content.
 
 ## Rule 2 — Architecture must not outrun the game
 
-A refactor is justified only when it:
+Refactor only when it:
 
-1. removes a current blocker,
-2. prevents near-term duplication,
-3. improves testability of something we are actively shipping,
-4. or directly improves a visible result.
+- removes a current blocker
+- prevents near-term duplication
+- improves active gameplay testability
+- or directly enables a visible result
 
----
+## Rule 3 — Preserve working foundations
 
-## Rule 3 — Preserve the working domain model
+Do not rewrite campaign, party, expedition, combat, or renderer foundations just to make them prettier architecturally.
 
-Do not rewrite campaign, party, expedition, combat, or progression foundations simply to make them look architecturally cleaner.
+## Rule 4 — Logical grid stays authoritative
 
-Refactor them incrementally when the vertical slice exposes a real limitation.
+Movement, collision, encounters, and LOS remain grid-based.
 
----
-
-## Rule 4 — Gameplay grid and presentation geometry remain separate
-
-Collision, movement, encounters, and visibility use the logical grid.
-
-Visual presentation may use:
+Presentation can use:
 
 - elevation
 - irregular geometry
-- sprite offsets
-- large props
+- offsets
+- large structures
 - bridges
-- foreground occlusion
-- decorative geometry
+- foreground
 - backdrop layers
 
-Do not force the visual scene to become a literal 1:1 tile map.
+## Rule 5 — Content must become explicit before it becomes enormous
+
+Use small C# definitions first.
+
+Do not build a generic content editor or external asset/data platform prematurely.
+
+## Rule 6 — Every meaningful implementation phase needs an exit condition
+
+The question is always:
+
+> **What will be better for the player when this phase is done?**
 
 ---
 
-## Rule 5 — Every major commit must produce a visible improvement
+# 8. Unified Production Gates
 
-Good:
+## Gate 0 — Measurement and Controlled Scenarios
 
-> Replace the reference-room floor renderer with authored stone modules and demonstrate a readable bridge/abyss composition.
+### Purpose
 
-Bad:
+Make the current game measurable before changing major rules.
 
-> Add another generic renderer abstraction with no change to the game.
+### Deliver
+
+- gameplay event model
+- lightweight recorder
+- deterministic scenario runner
+- fixed benchmark expedition scenarios
+- compact end-state snapshots
+
+### Events to capture
+
+- expedition start / end
+- room entry
+- discovery
+- interaction
+- battle start
+- command selection
+- ability use
+- damage
+- item use
+- enemy defeat
+- reward gain
+- extraction availability
+- extraction choice
+- death
+- floor transition
+
+### Exit condition
+
+Two builds can be compared through the same scripted scenario without reconstructing the run manually.
 
 ---
 
-## Rule 6 — The reference room is the visual benchmark
+# 9. Gate A — Visual Benchmark Room
 
-Before mass content creation, the project must have one room that can serve as the standard for:
+The Ruined Depths benchmark remains the visual reference scene.
 
-- environment art
+It must establish the standard for:
+
 - character scale
-- lighting
-- VFX
-- UI density
-- camera framing
-- depth / occlusion
-- interaction language
-
-New content is judged against that room.
-
----
-
-# 4. Implementation Sequence
-
-The project is now organized into these production gates:
-
-1. **Gate A — Visual Benchmark Room**
-2. **Gate B — Character Presentation**
-3. **Gate C — Atmosphere & Effects**
-4. **Gate D — Complete Exploration Slice**
-5. **Gate E — Complete Combat Slice**
-6. **Gate F — Campaign Loop**
-7. **Gate G — Production Biome**
-8. **Gate H — Progression Depth**
-9. **Gate I — Content Expansion**
-10. **Gate J — UX / Save / Accessibility**
-11. **Gate K — Alpha / Beta / Release Candidate**
-
-Each gate has a hard exit condition.
-
----
-
-# 5. Gate A — Visual Benchmark Room
-
-## Goal
-
-Transform the current reference chamber into a scene that visually communicates **Daedalus** immediately.
-
-This is the most important stage of the project.
-
-## A1. Lock the exploration composition
-
-Define a stable presentation target:
-
-- playfield dimensions
-- HUD region
-- camera framing
-- tile/world scale
-- party screen footprint
-- safe margins
-- minimap position
-- message / objective areas
-- interaction prompt position
-
-The current gameplay viewport and HUD should stop shifting between ad hoc sizes.
-
-### Acceptance
-
-The same room renders consistently across the intended window size without clipping the HUD.
-
----
-
-## A2. Replace the flat tile appearance
-
-Keep the logical tiles.
-
-Change the presentation.
-
-Implement:
-
-- authored floor modules
-- irregular stone seams
-- edge variation
-- wall caps
-- broken edges
-- rubble clusters
-- damaged masonry
-- large stone slabs
-- shadowed wall faces
-- floor transitions
-
-The floor should stop reading as a repeating chessboard.
-
-### Acceptance
-
-At normal gameplay scale, the room reads as stone architecture first and grid second.
-
----
-
-## A3. Build true layered depth
-
-Implement a generalized visual depth model:
-
-RenderPass → Elevation → WorldY → StableOrder
-
-The logical grid remains unchanged.
-
-Visual items gain enough information to determine:
-
-- vertical offset
-- foreground/background relationship
-- bridge level
-- occlusion
-- draw order
-
-The current render pass structure should be retained, but fixed depth values inside ExplorationRenderer should evolve into real item depth.
-
-### Acceptance
-
-A character can walk behind a wall edge, across a raised bridge, and in front of foreground debris with predictable ordering.
-
----
-
-## A4. Build the authored abyss
-
-The abyss is a major visual signature.
-
-It should contain:
-
-- near-black void
-- lower-level stone silhouettes
-- distant architecture
-- teal atmospheric glow
-- vertical haze
-- drifting particles
-- depth variation
-- broken masonry descending into darkness
-
-The abyss cannot remain a single black fill.
-
-### Acceptance
-
-The viewer can visually understand that the party is above a deep drop.
-
----
-
-## A5. Build architectural landmarks
-
-Create a small set of large authored scene anchors:
-
-- collapsed arch
-- monumental pillar
-- broken bridge
-- ancient terminal / mechanism
-- central resonance landmark
-- doorway
-- ruined altar / machine
-- rubble bank
-
-These should be placed deliberately rather than generated solely from random decoration.
-
-### Acceptance
-
-The room has a recognizable focal point and a reason to move through it.
-
----
-
-## A6. Establish the visual language
-
-The base Ruined Depths presentation should use:
-
-- cold stone
-- near-black negative space
-- restrained teal supernatural energy
-- warm amber firelight
-- muted metal / bone / parchment accents
-- danger red as a selective signal
-
-Avoid flooding the scene with saturated effects.
-
-### Acceptance
-
-A screenshot of the room is recognizable as one cohesive art direction.
-
----
-
-## Gate A Exit Condition
-
-The room screenshot should no longer look like a generic procedural dungeon.
-
-It must visibly demonstrate:
-
-- layered stone
-- bridge
-- abyss
+- environment material
 - elevation
-- authored landmark
-- foreground occlusion
-- four-member party
-- chest
+- occlusion
+- atmosphere
+- lighting
+- interaction language
+- HUD density
+- camera framing
+
+## A1 — Presentation frame
+
+Maintain:
+
+- stable exploration viewport
+- HUD rectangle
+- minimap region
+- objective region
+- message region
+- safe margins
+- stable camera/world scale
+
+### Exit
+
+No intended-size HUD clipping and repeatable composition.
+
+## A2 — Environment language
+
+The scene should read as architecture first and grid second.
+
+Required:
+
+- irregular stone modules
+- damaged masonry
+- wall caps / faces
+- slabs
+- rubble
+- architectural edges
+- substantial props
+
+### Exit
+
+The floor no longer visually reads as a procedural checkerboard.
+
+## A3 — Visual depth
+
+Use:
+
+**Render Pass + Elevation + World Y + Stable Order**
+
+Apply to:
+
+- terrain
+- bridge
+- pillars
+- props
+- characters
+- enemies
+- foreground
+
+### Exit
+
+At least three convincing depth planes with predictable occlusion.
+
+## A4 — Abyss
+
+Use:
+
+1. rim
+2. near darkness
+3. mid-depth architecture
+4. distant ruins
+5. teal haze
+6. particles
+7. falling debris
+
+### Exit
+
+The bridge visually reads as crossing a real drop.
+
+## A5 — Authored landmarks
+
+Required benchmark anchors:
+
+- bridge
+- monumental pillar
+- doorway / broken arch
 - terminal
-- enemy
-- minimap
-- objective / message UI
-- readable interaction cue
+- chest
+- resonance landmark
+- rubble banks
+- encounter space
 
----
+### Exit
 
-# 6. Gate B — Character Presentation
+The room has a clear focal hierarchy and visual route.
 
-## Goal
+## A6 — Lighting
 
-Make Arden, Lyra, Marek, and Sera immediately identifiable during normal play.
+Hierarchy:
 
-## B1. Create a production character visual definition
+1. base darkness
+2. warm practical light
+3. cool supernatural light
+4. character readability
+5. danger accents
 
-Replace hardcoded character drawing rules with data-driven presentation.
+Use localized lights rather than uniform scene tint.
 
-Each character should define:
+### Exit
 
-- sprite / atlas source
-- portrait source
-- idle frames
-- walk frames
-- direction frames
-- combat idle
-- attack
-- hit
-- defeat
-- skill
-- accent / secondary material
-- silhouette rules
+The landmark is important without washing the whole room in teal.
 
-The gameplay systems continue to use the existing character IDs.
+## A7 — Atmosphere
 
----
-
-## B2. Increase exploration readability
-
-Characters need to occupy enough screen area to read as people rather than markers.
-
-Priorities:
-
-1. silhouette
-2. equipment
-3. motion
-4. role
-5. face / detail
-
-Do not solve this by simply enlarging the current primitive shapes indefinitely.
-
----
-
-## B3. Build a minimal sprite asset pipeline
-
-Add an asset structure suitable for WinForms / System.Drawing, for example:
-
-assets/characters/arden/
-assets/characters/lyra/
-assets/characters/marek/
-assets/characters/sera/
-
-and equivalent folders for environment and UI art.
-
-Update the project file so these assets are copied or loaded reliably in development and published builds.
-
----
-
-## B4. Character animation
-
-Implement:
-
-- idle breathing / sway
-- directional walk
-- movement bob
-- simple action transitions
-- hit reaction
-- defeat state
-
-Animation can remain sprite-based and intentionally restrained.
-
----
-
-## Gate B Exit Condition
-
-A player can identify all four core characters from gameplay distance without reading the HUD.
-
----
-
-# 7. Gate C — Atmosphere & Effects
-
-## Goal
-
-Make the environment feel alive, ancient, dangerous, and supernatural.
-
-## C1. Lighting model
-
-Within the existing System.Drawing approach, approximate localized lighting through layered compositing rather than introducing a new graphics engine.
-
-Support:
-
-- base darkness
-- torch pools
-- teal resonance pools
-- danger tint
-- soft ambient haze
-- localized character light
-- distance falloff
-
----
-
-## C2. Environmental effects
-
-Implement reusable effects for:
+Use restrained:
 
 - dust
 - mist
-- sparks
+- motes
 - embers
-- floating motes
-- falling debris
-- energy wisps
+- resonance wisps
 - abyss particles
+- subtle environmental drift
 
-Effects should be spatially anchored to world locations.
+### Exit
+
+Effects enhance strong geometry rather than compensate for weak geometry.
 
 ---
 
-## C3. Gameplay feedback
+# 10. Gate B — Character Presentation
 
-Every important action needs a readable response:
+The first four characters are the benchmark set:
 
-- discover
-- interact
+- Arden
+- Lyra
+- Marek
+- Sera
+
+## B1 — Character definitions
+
+Each character presentation definition should eventually contain:
+
+- character ID
+- asset source
+- portrait
+- idle frames
+- walk frames
+- direction
+- action states
+- scale / draw offset
+- accent language
+
+## B2 — Readability
+
+Priority:
+
+1. silhouette
+2. role / weapon cue
+3. accent
+4. motion
+5. directional readability
+
+## B3 — Animation
+
+Required:
+
+- idle
+- walk
+- attack
+- hit
+- skill
+- defeat
+
+Animation should remain restrained and readable.
+
+### Exit condition
+
+A player can identify the four core characters at gameplay distance without consulting the HUD.
+
+---
+
+# 11. Gate C — Exploration Interaction and Atmosphere
+
+The benchmark HUD and interaction language should make the environment readable without feeling like a diagnostic interface.
+
+## Interaction states
+
+Every important interactable should communicate:
+
+- available
+- nearby
+- activated
+- completed
+- unavailable
+
+Targets:
+
+- chest
+- terminal
+- landmark
+- extraction
+
+Use combinations of:
+
+- rings
+- icons
+- prompt
+- glow
+- animation
+- state changes
+
+Avoid making every interaction identical.
+
+## Feedback signatures
+
+Maintain distinct responses for:
+
+- discovery
 - loot
 - heal
 - damage
 - poison
 - defend
-- enemy defeat
+- defeat
 - victory
 - extraction
 - danger
 
-Current FeedbackEffect infrastructure should be extended rather than replaced.
+### Exit condition
+
+Players understand what they can interact with and why an important event just happened.
 
 ---
 
-## C4. Landmark presentation
+# 12. Gate D — Exploration Decision Layer
 
-The existing authored landmark discovery message is a good foundation.
+This is the first major game-design expansion.
 
-Expand it into a short presentation event:
+## D1 — Move beyond transit
 
-1. visual pulse
-2. audio hook placeholder
-3. brief message
-4. optional camera emphasis
-5. persistent discovered state
+Introduce controlled situations where movement creates a choice:
 
-Do not turn it into a long cutscene.
+- safe vs dangerous
+- known vs unknown
+- low-value vs high-value
+- direct vs optional
+- recover vs continue
 
----
+## D2 — Room archetypes
 
-## Gate C Exit Condition
+Introduce a small set of authored room purposes:
 
-Walking through the room feels substantially different from moving through a plain tilemap.
+- traversal
+- reward
+- ambush
+- recovery
+- information
+- high-risk/high-value
+- landmark
 
----
+Do not produce dozens of room types.
 
-# 8. Gate D — Complete Exploration Slice
+## D3 — Explicit encounters
 
-## Goal
+Replace name-driven placement with explicit encounter definitions.
 
-Deliver the first genuine 10–20 minute playable experience.
+An encounter should specify:
 
-The player loop must be:
+- enemies
+- danger
+- reward tier
+- special rule
+- optionality
 
-**enter → orient → explore → discover → interact → encounter → fight → loot → choose whether to continue → extract**
+### Exit condition
 
-## D1. Opening sequence
-
-The first minute should communicate:
-
-- where the player is
-- who the party is
-- the objective
-- what extraction means
-- what can be interacted with
-
-No developer-only knowledge should be required.
-
----
-
-## D2. Exploration flow
-
-Add or refine:
-
-- authored room connections
-- encounter locations
-- chest locations
-- terminal interactions
-- landmark discovery
-- short environmental story beats
-- extraction node
+A short exploration route contains multiple plausible choices rather than one required path.
 
 ---
 
-## D3. Risk / reward
+# 13. Gate E — Tactical Combat Depth
 
-The expedition should ask the player to choose between:
+Refactor combat because the current system is already the strongest basis for mastery.
 
-- exploring further
-- collecting more resources
-- fighting
-- extracting early
+## E1 — Combat content definitions
 
-The exact economy can remain simple at this stage.
+Introduce small explicit definitions for:
 
----
+### Skills
 
-## D4. Extraction
+- ID
+- name
+- resource cost
+- power
+- targeting rule
+- damage type
+- status effects
+- tags
+- presentation key
 
-Extraction should:
+### Enemies
 
-- clearly signal the node
-- confirm party presence
-- summarize rewards
-- transition cleanly
-- return to campaign state
+- ID
+- family
+- behavior
+- base stats
+- abilities
+- target policy
+- reward tier
 
-The current extraction framework should be retained and polished.
+### Status effects
 
----
+Replace free-form strings with explicit identifiers.
 
-## Gate D Exit Condition
+## E2 — Combat result contract
 
-A new player can complete one short expedition from a fresh launch without debug knowledge.
+Combat resolution should produce a deterministic action result describing:
 
----
-
-# 9. Gate E — Complete Combat Slice
-
-## Goal
-
-Make tactical combat feel like the same game as exploration.
-
-## E1. Battlefield presentation
-
-Implement:
-
-- distinct battle arena
-- party formation placement
-- readable enemy silhouettes
-- clear turn order
-- target indication
-- movement / attack range cues when applicable
-
----
-
-## E2. Character and enemy states
-
-Show:
-
-- HP
-- status
-- active turn
-- attack
-- skill
-- defense
-- hit
-- defeat
-
-Do not rely solely on textual log output.
-
----
-
-## E3. Effects
-
-At minimum:
-
-- melee impact
-- ranged / magic impact
-- poison
-- guard
-- damage numbers
-- defeat animation
-- victory transition
-
----
-
-## E4. Combat UI
-
-Replace the feel of a debug command list with a deliberate tactical interface:
-
-- command selection
-- target selection
-- party portraits
-- active turn
-- status
-- concise action feedback
-
-Keyboard controls remain supported.
-
----
-
-## Gate E Exit Condition
-
-A complete battle can be captured in a screenshot and visually belongs to Daedalus.
-
----
-
-# 10. Gate F — Campaign Loop
-
-## Goal
-
-Make the expedition matter after the player returns.
-
-The loop becomes:
-
-**prepare → descend → extract → improve → descend again**
-
-## F1. Campaign presentation
-
-Polish:
-
-- roster
-- expedition entry
-- stash
-- materials
-- cores
-- gear
-- run history
-- depth
-
----
-
-## F2. Party management
-
-Add:
-
-- member selection
-- leader selection
-- formation selection
-- basic equipment visibility
-
-Do not overbuild character management yet.
-
----
-
-## F3. Progression payoff
-
-The player should have a concrete reason to care about:
-
-- gear
+- actor
+- target(s)
+- damage
 - resources
-- experience
-- morale
-- deeper floors
+- statuses
+- defeat
+- follow-up effects
+
+Presentation should consume this result.
+
+## E3 — Remove dead decisions
+
+The command list should only contain commands that create meaningful gameplay choices.
+
+Especially review:
+
+- Interact
+- Defend
+- Item
+- Run
+
+Do not delete options blindly; strengthen or remove them based on the experiment results.
+
+## E4 — Enemy behavior
+
+Enemy behaviors must become authored and learnable.
+
+The goal is for players to develop:
+
+> “I know what this enemy is going to try to do.”
+
+### Exit condition
+
+A player who understands the enemy composition can make better tactical decisions than a player seeing it for the first time.
 
 ---
 
-## Gate F Exit Condition
+# 14. Gate F — Expedition Risk and Push-Your-Luck
 
-The player completes one expedition, returns to campaign, changes something meaningful, and starts another expedition.
+This is the highest-priority design experiment after measurement.
+
+## F1 — Explicit expedition risk
+
+Introduce a dedicated risk model containing, at minimum:
+
+- current floor
+- carried value
+- party condition
+- available recovery
+- morale pressure
+- upkeep / time pressure
+- known danger
+- extraction availability
+
+## F2 — Real extraction choice
+
+The player must be able to recognize:
+
+**what is currently safe to bank**
+
+versus
+
+**what is still available by continuing**
+
+The implementation should allow optional continuation rather than making extraction only an endpoint.
+
+## F3 — Reward scaling
+
+Deeper or riskier opportunities should provide qualitatively better reasons to continue.
+
+Avoid pure inflation.
+
+## F4 — Recovery
+
+Recovery must create tradeoffs.
+
+Healing should cost something meaningful in the expedition context:
+
+- time
+- resources
+- opportunity
+- another action
+- location access
+
+## F5 — Risk readability
+
+The player should understand enough of the current situation to make an informed gamble.
+
+### Exit condition
+
+Players can explain why they extracted in one run and pushed deeper in another.
 
 ---
 
-# 11. Gate G — First Production Biome
+# 15. Gate G — Progression and Build Identity
 
-## Goal
+Do not deepen progression until the expedition and combat loops are working.
 
-Build **The Ruined Depths** as the first complete biome.
+## G1 — Character definitions
 
-Do not build all four biomes simultaneously.
+Separate authored character identity from runtime state.
 
-## Environment target
+Definitions should cover:
 
-Create a reusable production kit containing approximately:
+- role
+- growth
+- base stats
+- skills
+- tags
 
-- 10–20 environment modules
+## G2 — Gear definitions
+
+Separate:
+
+- gear identity
+- slot
+- base power
+- effects
+
+from ownership and equipped state.
+
+## G3 — Meaningful build differences
+
+A good upgrade changes:
+
+**what the player does**
+
+not merely:
+
+**how large a number appears**
+
+Examples of the intended shape:
+
+- stronger burst vs resource efficiency
+- durability vs output
+- setup vs immediate damage
+- safety vs speed
+
+These are design directions, not final numbers.
+
+### Exit condition
+
+Changing party composition or equipment changes the player's preferred solutions to expedition problems.
+
+---
+
+# 16. Gate H — Morale and Campaign Preparation
+
+## H1 — Morale
+
+Move beyond:
+
+**event → number changes → hidden modifier**
+
+toward:
+
+**state → visible consequence → decision**
+
+Potential state bands:
+
+- confident
+- steady
+- shaken
+- broken
+
+Potential consequences can include:
+
+- retreat consequences
+- event access
+- combat effects
+- recovery cost
+
+Do not implement campaign drama until playtesting shows that morale is interesting.
+
+## H2 — Preparation
+
+The campaign should answer:
+
+> **“What am I changing before the next run?”**
+
+Preparation should eventually cover:
+
+- party
+- leader
+- formation
+- equipment
+- consumables
+- core / specialization choices
+
+### Exit condition
+
+An extracted run naturally creates at least one meaningful preparation decision for the next expedition.
+
+---
+
+# 17. Gate I — Production Biome
+
+Only after the benchmark and decision loops work.
+
+## Ruined Depths production kit
+
+Approximately:
+
+- 10–20 reusable environment modules
 - 10+ props
-- multiple wall styles
+- several wall styles
 - bridge variations
 - floor variations
 - landmark set
 - doorway / transition pieces
-- background structures
+- backdrop structures
 - foreground blockers
 
-## Content target
+## Content
 
-Create approximately:
+Approximately:
 
 - 3–5 enemy types
 - 3–5 event types
 - multiple encounter compositions
-- controlled loot tables
 - several room archetypes
-- at least one special landmark
-- one extraction space
+- controlled loot tables
+- special landmark
+- extraction space
 
-## Story target
-
-Use visual and short textual clues to communicate:
+The biome should communicate:
 
 - who built the ruins
 - what changed
 - what remains active
-- why the player should care
+- why deeper exploration matters
+
+### Exit condition
+
+A player can spend meaningful time in the Ruined Depths without every room feeling interchangeable.
 
 ---
 
-## Gate G Exit Condition
+# 18. Gate J — Content Expansion
 
-A player can spend meaningful time in The Ruined Depths without feeling that every room is the same template.
+Expand only after the first biome establishes a proven production pattern.
 
----
+Planned biome families:
 
-# 12. Gate H — Progression Depth
+1. Ruined Depths
+2. Ashen Halls
+3. Verdant Below
+4. Crystal Wastes
 
-Only after the first production biome works should the systems receive additional depth.
-
-## H1. Roster
-
-Expand toward 5–8 production characters.
-
-Voss becomes the next fully authored character after the initial four.
-
----
-
-## H2. Gear
-
-Add:
-
-- weapons
-- armor
-- accessories
-- rarity
-- conditional effects
-
----
-
-## H3. Cores
-
-Add:
-
-- core families
-- tiers
-- synthesis choices
-- visible impact on builds
-
----
-
-## H4. Morale
-
-Morale must eventually do something players can feel.
-
-Possible directions can be evaluated during playtesting:
-
-- temporary stat impact
-- event outcomes
-- retreat risk
-- dialogue / campaign consequences
-
-The exact mechanic should be tuned through play, not locked prematurely.
-
----
-
-## H5. Campaign consequence layer
-
-Eventually support:
-
-- deeper destinations
-- campaign state changes
-- alignment consequences
-- meaningful preparation choices
-
----
-
-## Gate H Exit Condition
-
-Repeated expeditions create real build and preparation decisions.
-
----
-
-# 13. Gate I — Content Expansion
-
-Expand the production pattern from The Ruined Depths.
-
-Biomes:
-
-1. The Ruined Depths
-2. The Ashen Halls
-3. The Verdant Below
-4. The Crystal Wastes
-
-Each biome receives:
+Each biome must have its own:
 
 - architecture
 - palette
 - lighting profile
-- backdrop language
+- backdrop
 - hazards
 - enemies
 - props
@@ -868,27 +997,17 @@ Each biome receives:
 - loot
 - events
 - narrative fragments
-- unique combat compositions
+- combat compositions
 
-The new biome is not allowed to be a recolor-only implementation.
-
----
-
-## Gate I Exit Condition
-
-All planned biomes are recognizably different while still belonging to the same game.
+A new biome cannot be a recolor of the previous one.
 
 ---
 
-# 14. Gate J — UX, Save, Accessibility
-
-Only after the core game is proven.
-
-## J1. UI
+# 19. Gate K — UX, Save, Accessibility
 
 Complete:
 
-- campaign menu
+- campaign UI
 - party management
 - inventory
 - equipment
@@ -897,62 +1016,48 @@ Complete:
 - extraction results
 - settings
 
----
-
-## J2. Save reliability
-
-Implement:
+Save work:
 
 - autosave
 - manual save
 - save slots
 - validation
-- migration strategy
-- failure recovery
+- migration
+- recovery
 
----
-
-## J3. Accessibility
-
-Support, as practical for the game:
+Accessibility:
 
 - text scaling
-- readable contrast
-- reduced screen effects
+- contrast
+- reduced effects
 - reduced flashes
 - animation options
-- color-independent state communication
+- color-independent communication
 - input remapping
 
----
-
-## Gate J Exit Condition
-
-The complete core loop can be played comfortably without relying on prototype-only UI.
+This gate follows the proven core loop rather than preceding it.
 
 ---
 
-# 15. Gate K — Alpha / Beta / Release Candidate
+# 20. Gate L — Alpha / Beta / Release Candidate
 
 ## Alpha
 
 Everything important exists.
 
-Known problems may include:
+Acceptable roughness:
 
-- placeholder art
+- placeholder assets
 - balance issues
 - rough transitions
-- duplicate assets
-- ugly edge cases
+- asset duplication
+- edge-case bugs
 
-No architectural rewrite.
-
----
+Do not use Alpha as an excuse for another architectural rewrite.
 
 ## Beta
 
-Focus entirely on:
+Focus on:
 
 - balance
 - pacing
@@ -966,8 +1071,6 @@ Focus entirely on:
 
 No new major systems.
 
----
-
 ## Release Candidate
 
 Feature freeze.
@@ -978,351 +1081,456 @@ Only:
 - optimization
 - accessibility
 - balance
-- asset consistency
 - UX polish
+- asset consistency
 - save validation
-- release packaging
+- packaging
 
 ---
 
-# 16. Refactor Queue
+# 21. Refactor Program
 
-These are legitimate engineering improvements, but they should be scheduled around production needs.
+The production gates above determine **when** to refactor.
 
-## R1. Generalized exploration render depth
+These are the actual refactor seams.
 
-Current state:
+## R0 — Instrumentation
 
-- ExplorationRenderer has explicit render passes
-- individual renderers perform some Y ordering
-- depth values are mostly fixed at renderer level
+Add:
 
-Target:
+- gameplay events
+- recorder
+- scenario harness
+- deterministic snapshots
 
-RenderPass + Elevation + WorldY + StableOrder
+Purpose:
 
-Trigger:
+Make design experiments measurable.
 
-**Do this during Gate A** because layered environment presentation needs it.
+## R1 — Game flow seam
 
----
+Reduce `GameSession` toward orchestration.
 
-## R2. Data-driven visual assets
+Potential boundaries:
 
-Current state:
+- `GameFlow`
+- `ExplorationActions`
+- `BattleActions`
 
-- character visuals are hardcoded in EntityRenderer
-- world visuals rely heavily on primitives
+Purpose:
 
-Target:
+Make gameplay changes independently testable.
 
-- character visual definitions
-- sprite sheets / atlases
-- reusable world assets
-- prop definitions
+## R2 — Exploration content seam
 
-Trigger:
+Separate:
 
-**Do this during Gates A–B.**
+**topology**
 
----
+from
 
-## R3. Room definition data
+**content**
 
-Current state:
+from
 
-- authored features are represented as records
-- reference-room construction is still embedded in world generation
+**presentation metadata**
 
-Target:
+Keep the benchmark authored.
 
-A data-driven room definition capable of specifying:
+Purpose:
 
-- visual features
-- props
-- elevation
-- landmarks
-- encounter nodes
-- extraction node
-- backdrop composition
+Create meaningful exploration variation without rewriting the generator.
 
-Trigger:
+## R3 — Combat content seam
 
-**Do this when Gate A stops being maintainable with the current hardcoded reference room.**
+Separate:
 
----
+- skill definitions
+- enemy definitions
+- status identifiers
+- combat action results
 
-## R4. Compatibility cleanup
+from combat state resolution and presentation.
 
-Current state includes compatibility paths such as the older player bridge and mixed state/data responsibilities.
+Purpose:
 
-Do not remove them simply for cleanliness.
+Make tactical experiments cheap.
 
-Remove or consolidate them when:
+## R4 — Expedition risk seam
 
-- the new party/exploration state is authoritative,
-- existing tests no longer require the compatibility layer,
-- and the removal reduces active complexity.
+Make risk and extraction explicit.
 
----
+Purpose:
 
-## R5. Legacy renderer retirement
+Make the game's signature push-your-luck loop tunable.
 
-Known legacy files include:
+## R5 — Progression seam
 
-- ui/TopDownWorldRenderer.cs
-- game/TileRenderer.cs
-- ui/BattleMenuRenderer.cs
+Separate authored character / gear definitions from runtime state.
 
-Retire them only after repository-wide reference checks confirm they are unused.
+Purpose:
 
-Do not delete them speculatively.
+Make build experiments cheap.
 
----
+## R6 — Morale seam
 
-## R6. Expedition determinism
+Give morale explicit effects only after the risk loop establishes a reason for it.
 
-The current expedition restart path can use a random seed.
+## R7 — Campaign preparation seam
 
-Add explicit seed injection so tests and reproducible content can say:
+Turn campaign state from a destination into a preparation decision layer.
 
-- seed
-- floor
-- room layout
-- encounter placement
+## R8 — Compatibility retirement
 
-This becomes important once the authored / procedural boundary is formalized.
+Only after the canonical model survives gameplay iteration.
 
----
+Remove:
 
-## R7. Reward quantity correctness
+- obsolete player bridge
+- duplicated health authority
+- duplicated position authority
+- legacy inventory compatibility
+- obsolete campaign fields
 
-Review extraction summary calculations so stacked resources report quantities rather than only collection counts.
+Then retire unused renderers:
 
-Do this before economy balancing.
+- `ui/TopDownWorldRenderer.cs`
+- `game/TileRenderer.cs`
+- `ui/BattleMenuRenderer.cs`
+
+Only after repository-wide reference checks.
 
 ---
 
-# 17. Code / Asset Organization Target
+# 22. Data Ownership
 
-The project should converge toward:
+The architecture should converge toward:
 
-game/
-- state
-- systems
-- party
-- world
-- content
-- presentation-neutral models
+| Layer | Owns |
+|---|---|
+| Campaign | persistent roster, stash, gear, materials, cores, recipes, flags, depth |
+| Expedition | run-specific party, floor, carried value, discoveries, upkeep, risk, extraction state |
+| World | transient floor topology, encounters, props, nodes, spatial simulation |
+| Combat | current battle state and deterministic action resolution |
+| Presentation | render state, animation, effects, HUD, screen composition |
+| Application / Flow | high-level commands and state transitions |
 
-ui/
-- exploration
-- battle
-- campaign
-- rendering
-- input
+The UI never owns gameplay rules.
 
-assets/
-- characters
-- environments
-- props
-- effects
-- portraits
-- UI
-
-The domain should never depend on the UI renderer to define gameplay truth.
+The renderer never mutates authoritative gameplay state.
 
 ---
 
-# 18. Test Strategy
+# 23. Controlled Design Experiments
 
-Tests remain important, but they change emphasis.
+These should be run against the actual game rather than answered by intuition.
 
-## Keep unit coverage for:
+## Experiment 1 — Extraction pressure
 
-- state transitions
-- combat rules
-- visibility
-- movement
-- formation
+Create:
+
+- known reward
+- optional dangerous reward
+- meaningful loss risk
+
+Measure:
+
+- extract vs push
+- decision time
+- explanation of choice
+- resources remaining
+- value carried
+
+## Experiment 2 — Enemy mastery
+
+Create two visibly distinct behavior patterns.
+
+Measure whether players:
+
+- notice
+- predict
+- exploit
+- change their strategy after learning
+
+## Experiment 3 — Party composition
+
+Give players the same encounter with different party compositions.
+
+Measure whether their tactics change.
+
+## Experiment 4 — Build choice
+
+Offer two upgrades with different strategic effects.
+
+Measure whether players can explain the tradeoff.
+
+## Experiment 5 — Knowledge progression
+
+Repeat a scenario with the same mechanical difficulty.
+
+Compare first exposure with later attempts.
+
+The desired result is better decisions from learned understanding, not only greater character power.
+
+---
+
+# 24. Measurement Strategy
+
+## Automated telemetry
+
+Eventually record:
+
+- expedition duration
+- turns
+- rooms entered
+- optional content entered
+- battle count
+- commands
+- targets
+- abilities
+- items
+- damage
+- retreats
+- extraction timing
+- depth
+- carried value
+- remaining resources
+- death
+- party configuration
+- equipment configuration
+
+## Qualitative observation
+
+After a run, ask:
+
+> **“What was the hardest decision you had to make?”**
+
+Also ask:
+
+> **“What did you learn that you would use next time?”**
+
+These answers should be treated as evidence alongside telemetry.
+
+---
+
+# 25. Scenario Testing
+
+Use fixed seeds and scripted sequences for repeatability.
+
+Required scenarios:
+
+1. safe extraction
+2. greedy push
+3. failed combat
+4. resource-starved run
+5. morale deterioration
+6. gear-driven build change
+7. alternate party composition
+8. optional high-value encounter
+9. deeper-floor continuation
+
+Each scenario should be able to compare:
+
+- starting state
+- actions
+- resulting state
 - rewards
-- extraction
-- progression
-- synthesis
-- save/load
+- risk
+- extraction outcome
 
-## Add integration-style checks for:
-
-- complete expedition loop
-- campaign return
-- battle victory
-- discovery flow
-- landmark interaction
-- extraction flow
-
-## Add visual acceptance checks manually for:
-
-- reference room
-- character readability
-- combat screen
-- campaign screen
-- biome identity
-
-Automated tests protect rules.
-
-Human visual review protects the actual game.
+Do not snapshot implementation details that do not affect player-visible behavior.
 
 ---
 
-# 19. Commit Strategy
+# 26. Visual Validation
 
-Development should proceed in small, green commits.
+CI proves:
 
-Preferred pattern:
+- compilation
+- tests
+- deterministic logic
 
-1. one visible feature
-2. tests updated
-3. local compile/test
-4. commit
-5. GitHub Actions green
-6. proceed
+It does **not** prove appearance.
 
-Avoid giant commits that combine:
+For visual work, use the F1 dev menu to establish repeatable inspection points:
 
-- new systems
-- visual rewrites
-- asset loading
-- unrelated cleanup
-- speculative architecture
+1. benchmark entry
+2. bridge + abyss
+3. landmark
+4. interaction
+5. combat transition
 
-A commit should answer:
+Check:
 
-> **What changed for the player?**
+- depth
+- occlusion
+- lighting hierarchy
+- character scale
+- HUD clipping
+- interaction readability
+- visual focus
 
----
-
-# 20. Immediate Implementation Backlog
-
-The next implementation sequence is intentionally narrow.
-
-### Sprint 1 — Reference Room Reconstruction
-
-1. Fix exploration viewport / HUD clipping.
-2. Lock room camera and playfield composition.
-3. Generalize render depth ordering.
-4. Replace checkerboard-like floor presentation.
-5. Add authored wall / floor / rubble variation.
-6. Build a visually deep abyss.
-7. Add a major architectural focal point.
-8. Add real foreground occlusion.
-9. Tune the teal resonance landmark.
-
-### Sprint 2 — Character Readability
-
-10. Establish asset loading infrastructure.
-11. Replace primitive character bodies with authored sprite presentation.
-12. Enlarge exploration character footprint appropriately.
-13. Add directional idle / walk animation.
-14. Add four production portraits.
-15. Add readable leader / selection states.
-
-### Sprint 3 — Atmosphere
-
-16. Add localized torch lighting.
-17. Add localized teal environmental lighting.
-18. Add mist / dust / particles.
-19. Add discovery and landmark presentation.
-20. Add combat impact effects.
-
-### Sprint 4 — Exploration Slice
-
-21. Author the first 10–20 minute route.
-22. Connect chest, terminal, landmark, enemy, and extraction.
-23. Add concise introductory messaging.
-24. Validate the full loop with no developer controls.
-
-### Sprint 5 — Combat Slice
-
-25. Redesign battlefield composition.
-26. Add party/enemy presentation.
-27. Add turn and target readability.
-28. Add action effects.
-29. Add victory / defeat transitions.
-
-Only after Sprints 1–5 pass their visual and gameplay gates should production-biome expansion begin.
+Manual visual validation is a required part of visual acceptance.
 
 ---
 
-# 21. Definition of Done
+# 27. Performance Constraints
 
-The project is not done because:
+The current renderer remains immediate-mode `System.Drawing`.
 
-- all classes compile,
-- every system has a test,
-- every file in the original architecture exists,
-- or every planned mechanic has a stub.
+Maintain:
 
-A milestone is done when a player can **see and use the intended experience**.
+- bounded particle counts
+- localized translucent compositing
+- cached fonts/resources where practical
+- limited gradients
+- deterministic low-cost animation
+- no unnecessary off-screen redraw
 
-The finished Daedalus standard is:
-
-> **A player enters an ancient ruin with four recognizable characters, sees a dramatic layered environment, understands where they are and what they are doing, explores through meaningful spaces, discovers secrets, fights tactically, collects resources, decides when to extract, returns to a persistent campaign, improves the expedition party, and wants to descend again.**
-
-Everything else in the implementation plan exists to make that loop real, readable, and repeatable.
+Do not migrate to a GPU renderer until validated gameplay and content requirements justify it.
 
 ---
 
-# 22. Current Priority
+# 28. Asset Strategy
 
-**Do not start another broad systems phase.**
+## Stage 1 — Authored procedural presentation
 
-The immediate target is:
+Continue using `System.Drawing` to establish:
 
-> **Build the first spectacular Ruined Depths room.**
-
-That room becomes the production benchmark for:
-
-- environment art
-- character art
-- camera
+- geometry
+- material language
 - depth
 - lighting
-- effects
-- interaction
-- UI
-- combat presentation
+- animation
+- composition
 
-Once that benchmark is convincing, the rest of the project becomes an exercise in extending a proven visual and gameplay language rather than inventing the game piecemeal.
+## Stage 2 — Authored raster replacement
 
+Once the benchmark is compositionally locked, prioritize assets in this order:
+
+1. four core characters
+2. landmark
+3. bridge
+4. major wall / arch pieces
+5. terminal
+6. chest
+7. enemies
+8. secondary props
+
+The purpose is to avoid creating large quantities of art before the required composition is understood.
 
 ---
 
-# 23. Sprint 1 Status — Reference Room Reconstruction
+# 29. Legacy / Superseded Material
 
-## Completed in the first implementation batch
+The following concepts from older documents are considered **historical guidance**, not active plans:
 
-The current branch now includes the first visual reconstruction pass:
+- the former Phase 1–9 architecture-first roadmap
+- generic asset registries
+- premature GPU migration
+- broad room-editor work
+- large external content pipelines
+- speculative ECS architecture
+- simultaneous production of all four biomes
+- static-unit depth as an immediate requirement
 
-- removed the strongest alternating checkerboard floor treatment
-- added deterministic stone-slab and fracture variation
-- increased masonry and wall-surface variation
-- added deeper abyss silhouettes and internal atmospheric depth cues
-- made ruin features sort by elevation before world Y
-- made static units and interactive props sort by elevation before world Y
-- made party members and enemies render using their logical tile elevation
-- tightened the exploration HUD footer so controls remain inside the intended panel
+Useful principles from the old architecture document are retained here:
 
-This is an incremental visual pass, not the completion of the benchmark room.
+- preserve the square logical grid
+- separate persistent campaign state from transient expedition state
+- keep renderers read-only
+- make rewards change decisions
+- use vertical slices
+- prevent architecture from outrunning gameplay
+- use software compositing until a real GPU requirement exists
 
-## Still required for Gate A
+---
 
-- authored large environment assets
-- stronger vertical architecture
-- a more substantial landmark focal point
-- true foreground obstruction/occlusion
-- localized environmental lighting
-- stronger abyss depth and parallax
-- production character art
-- final camera composition
+# 30. Immediate Development Order
 
-The next work should continue from this state rather than restarting the renderer.
+The project should now move in this order:
+
+### Now
+
+**Gate A visual benchmark completion + R0 measurement**
+
+Continue the visual benchmark because it is the presentation reference, while adding the minimum instrumentation required to evaluate the game loop.
+
+### Next
+
+**R1 GameFlow seam**
+
+Do not fully rewrite `GameSession`; extract only the boundaries required for experiments.
+
+### Then
+
+**R3 combat content seam**
+
+Because combat is already the strongest tactical system.
+
+### Then
+
+**R4 expedition pressure experiment**
+
+Make the push/extract choice real and measurable.
+
+### Then
+
+**R2 exploration content**
+
+Use the risk model to create optional exploration decisions.
+
+### Then
+
+**R5 progression/build identity**
+
+Make characters and gear change player behavior.
+
+### Then
+
+**R6/R7 morale + campaign preparation**
+
+Give the meta loop a concrete reason to repeat.
+
+### Only after the above
+
+**Gate I production biome and broad content expansion.**
+
+---
+
+# 31. Definition of “Fun Enough to Expand”
+
+Do not move into broad content expansion merely because the game contains:
+
+- more rooms
+- more enemies
+- more gear
+- more menus
+- more animations
+
+Expansion is justified when a short expedition reliably contains:
+
+- discovery
+- a meaningful tactical encounter
+- resource pressure
+- at least one real risk/reward decision
+- a reason to continue
+- a reason to extract
+- a meaningful post-run preparation choice
+- at least one lesson that can improve the next attempt
+
+That is the minimum loop the rest of the game should multiply.
+
+---
+
+# 32. Guiding Question for Every Commit
+
+Before implementing a change:
+
+> **What is visibly or experientially better when the player launches Daedalus?**
+
+For a refactor, the answer must additionally be:
+
+> **What design experiment or gameplay decision does this refactor make easier to build or evaluate?**
+
+If neither answer is clear, the work is not the next priority.
