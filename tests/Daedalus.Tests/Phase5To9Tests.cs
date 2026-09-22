@@ -525,4 +525,65 @@ public class Phase5To9Tests
     }
 
 
+
+    [Fact]
+    public void GameFlow_AllowsExpectedGameplayTransitions()
+    {
+        GameFlow flow = new(GameState.Campaign);
+
+        Assert.True(flow.CanTransitionTo(GameState.Exploration));
+        flow.TransitionTo(GameState.Exploration);
+
+        Assert.True(flow.CanTransitionTo(GameState.Battle));
+        flow.TransitionTo(GameState.Battle);
+
+        Assert.True(flow.CanTransitionTo(GameState.GameOver));
+        flow.TransitionTo(GameState.GameOver);
+
+        Assert.True(flow.CanTransitionTo(GameState.Exploration));
+        flow.TransitionTo(GameState.Exploration);
+
+        Assert.True(flow.CanTransitionTo(GameState.ExtractionResults));
+        flow.TransitionTo(GameState.ExtractionResults);
+
+        Assert.True(flow.CanTransitionTo(GameState.Campaign));
+        flow.TransitionTo(GameState.Campaign);
+
+        Assert.Equal(GameState.Campaign, flow.State);
+    }
+
+    [Fact]
+    public void GameFlow_RejectsInvalidTransitions()
+    {
+        GameFlow flow = new(GameState.Campaign);
+
+        Assert.False(flow.CanTransitionTo(GameState.Battle));
+        Assert.Throws<InvalidOperationException>(() => flow.TransitionTo(GameState.Battle));
+        Assert.Equal(GameState.Campaign, flow.State);
+
+        flow.TransitionTo(GameState.Exploration);
+
+        Assert.False(flow.CanTransitionTo(GameState.GameOver));
+        Assert.Throws<InvalidOperationException>(() => flow.TransitionTo(GameState.GameOver));
+        Assert.Equal(GameState.Exploration, flow.State);
+    }
+
+    [Fact]
+    public void GameSession_UsesGameFlowWithoutChangingPublicStateBehavior()
+    {
+        GameSession session = new(new GameWorld(1, 12345));
+
+        Assert.Equal(GameState.Exploration, session.State);
+
+        session.ReturnToCampaign();
+        Assert.Equal(GameState.Exploration, session.State);
+
+        Assert.True(session.ExtractExpedition() == false);
+
+        session.ToggleDevMenu();
+        session.JumpToDevFloor();
+        Assert.Equal(GameState.Exploration, session.State);
+    }
+
+
 }
