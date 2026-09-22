@@ -1,5 +1,8 @@
 # DAEDALUS — Game Design Analysis → Refactor Plan
 
+> **Fun-analysis basis:** [`DAEDALUS_FUN_ANALYSIS.md`](DAEDALUS_FUN_ANALYSIS.md) is the experiential analysis behind this refactor sequence. It identifies decision density, mastery, expedition pressure, party ownership, and progression as the primary design gaps to test.
+
+
 > **Purpose**
 >
 > This is the design-driven refactor overlay for Daedalus.
