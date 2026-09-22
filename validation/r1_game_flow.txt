@@ -1,0 +1,1 @@
+R1 validation marker: GameFlow now owns explicit gameplay state transitions.
