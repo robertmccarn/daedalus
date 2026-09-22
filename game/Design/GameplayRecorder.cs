@@ -1,9 +1,14 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 public sealed class GameplayRecorder
 {
     private readonly List<GameplayEvent> events = new();
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public IReadOnlyList<GameplayEvent> Events => events;
 
@@ -41,7 +46,7 @@ public sealed class GameplayRecorder
 
         foreach (GameplayEvent item in events)
             builder
-                .AppendLine(JsonSerializer.Serialize(item));
+                .AppendLine(JsonSerializer.Serialize(item, JsonOptions));
 
         return builder.ToString();
     }
